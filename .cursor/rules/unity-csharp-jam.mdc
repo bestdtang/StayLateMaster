@@ -1,0 +1,62 @@
+---
+description: Unity C# Jam 编码规范（2D / URP）
+globs: Assets/**/*.cs
+alwaysApply: false
+---
+
+# Unity C# — Jam 规范
+
+## 风格
+
+- 一个脚本一个职责；Jam 阶段优先 `MonoBehaviour`，不强行上 ECS / 复杂 DI
+- 类名与文件名一致，PascalCase；私有字段 `_camelCase`
+- Inspector 暴露用 `[SerializeField] private`，避免 `public` 字段
+
+```csharp
+// ✅
+[SerializeField] private float _moveSpeed = 5f;
+
+// ❌
+public float moveSpeed = 5f;
+```
+
+## 性能与生命周期
+
+- `GetComponent` / `Find` 只在 `Awake` 或 `Start` 缓存，**禁止在 `Update` 里查找**
+- 避免每帧 `Instantiate`/`Destroy`；简单对象池或复用 GameObject
+- 2D 移动优先 `Rigidbody2D` + `MovePosition`/`velocity`，或 `transform` 位移（无物理时）
+
+## 输入与 UI
+
+- 使用 Unity **Input System** 或旧 Input Manager，与项目已有方式保持一致，不混用两套
+- 本游戏输入：**空格**眨眼；**← / →** 滑卡；需支持双手同时操作
+- UI 用 **uGUI (Canvas)** + **TextMeshPro**；快乐条、兴趣气泡常驻；火热进度仅火热时显示
+- 卡片在 `RectMask2D` 内用 DOTween 做滑出动画；输入由 `SwipeInput` 方向键驱动，避免与空格眨眼抢焦点
+
+## 本游戏脚本约定
+
+- 按 `gameplay-core.mdc` 的目录放脚本；数值类（快乐/疲劳/Topic 权重）集中管理，不散落在 View 里
+- Topic 用 `TopicId` enum + 单个 `CardSpriteLibrary` SO（每 Topic 一条 Sprite 数组）；卡片 prefab 由 `FeedSpawner` Instantiate，滑出后 Destroy
+- 疲劳阶段（0–49 / 50–79 / 80–99 / 100）用阈值常量或 SO，供 `FatigueVisuals` 与增速曲线共用
+
+## Jam 反模式（避免）
+
+```csharp
+// ❌ 过度抽象
+interface IMovable { void Move(); }
+class MovementStrategyFactory { ... }
+
+// ✅ 够用就好
+void Update() {
+    _rb.velocity = _input * _speed;
+}
+```
+
+- 不添加无请求的单元测试、Editor 工具、Addressables
+- 不用 `SendMessage`；用直接引用、UnityEvent 或 C# event
+
+## 常见模式
+
+- **全局状态**: 单个 `GameManager` 或轻量 static event 即可，避免 Service Locator 网
+- **场景切换**: `SceneManager.LoadScene`，异步加载非必须时不做
+- **配置**: 魔法数字可硬编码；同一数值多处使用时再抽 `[SerializeField]` 或 SO
