@@ -8,7 +8,7 @@
 - **运行时数值权威来源**：`Assets/Scenes/SampleScene.unity` 中 `RunController` 绑定的 `Assets/Data/DefaultGameBalanceConfig.asset`。
 - `Assets/Scripts/Data/GameBalanceConfig.cs` 中的字段初值只是未绑定 Asset 时的回退值。
 - 可调倍率、阈值、时长统一引用配置字段名；本清单不写死容易过时的数值。
-- 当前结论：**核心玩法逻辑已完成到火热时间**；**C1 开始菜单**与**局内教程开局流程**已接入；局内教程/退出 HUD 按钮、胜负全屏页与基础音效仍缺失。
+- 当前结论：**核心玩法逻辑已完成到火热时间**；**C1 开始菜单**与**局内教程开局流程**已接入；**Audio 框架（C4）**已落地，待挂载 Clip；局内教程/退出 HUD 按钮、胜负全屏页仍缺失。
 
 ---
 
@@ -16,11 +16,14 @@
 
 ### A1. 项目、数值与单局状态
 
-- [x] 目录与基础资源结构：`Assets/Scripts/{Core,Stats,Pendulum,Phone,Interest,Recommendation,HotStreak,Visual,UI,Data}`、`Assets/{Prefabs,Art,Audio,Doc}`。
+- [x] 目录与基础资源结构：`Assets/Scripts/{Core,Stats,Pendulum,Phone,Interest,Recommendation,HotStreak,Visual,UI,Data,Audio}`、`Assets/{Prefabs,Art,Audio,Doc}`。
 - [x] Unity 2022.3 LTS、URP 2D 与 Physics2D 基础设置可用。
-- [x] `Stats/HappinessMeter.cs`：快乐值 0–100，加减后 clamp；满值触发胜利事件；场景 `HappinessBar` 已绑定。
-- [x] `Stats/FatigueMeter.cs`：疲劳值 0–100，只增不减；自然增速、加速度、上限与尾段衰减均由 `GameBalanceConfig` 注入；满值触发失败事件；场景 `TiredBar` 已绑定。
-- [x] 疲劳临时倍率按 `FatigueModifierSource` 管理：同源最新覆盖、跨源相乘、到期移除。
+- [x] `Stats/HappinessMeter.cs`：快乐值 0–100，加减后 clamp；满值触发胜利事件；场景 `HappinessBar` 已绑定；≥85 时 fill 白/原色闪烁（`StatBarBlinkView`）；支持 `SetFillDriveExternal` 供 MiddleLayer lag 视图驱动 Fill。
+- [x] `UI/HappinessMiddleLayerView.cs`：加快乐 MiddleLayer 先跳、Fill Retarget 后追；减快乐 Fill 先落、MiddleLayer 后追；提升/缺失两色、不闪烁；火热连滑连续追赶；加快乐 scale punch（不低于 1）；减快乐仅向右水平抖动后回原点。
+- [x] `Stats/FatigueMeter.cs`：疲劳值 0–100，只增不减；自然增速、加速度、上限与尾段衰减均由 `GameBalanceConfig` 注入；满值触发失败事件；场景 `TiredBar` 已绑定；≥85 时 fill 白/原色闪烁（`StatBarBlinkView`）；暴露 `OnModifiersChanged` / `TryGetBlinkRateMultiplier` 供 MiddleLayer。
+- [x] `UI/FatigueMiddleLayerView.cs`：`TiredBar/MiddleLayer` 始终比 Fill 长 `_leadAmount`；Blink 修饰三态（减缓/自然/加速）换色 + 慢/中/快颜色 pulse；三态独立 fillAmount 呼吸幅度与半周期；TiredBar 根节点三档 scaleY 蠕动（普通：无 Blink 或减缓；加速：Blink mult>1；疯狂：超级疲劳），仅 Y 轴 Yoyo；疲劳为 0 时 MiddleLayer 隐藏但根节点仍普通蠕动。
+- [x] `Stats/CrazyFatigueController.cs`：连续 3 次完全失败进入超级疲劳（`CrazyFatigue` 增速 × 配置、钟摆周期略快）；成功或偏早/偏晚眨眼 1 次解除；`OnEntered`/`OnExited` 供后续视觉。
+- [x] 疲劳临时倍率按 `FatigueModifierSource` 管理：同源最新覆盖、跨源相乘、到期移除；`ClearModifier` 供超级疲劳退出。
 - [x] `Core/GameState.cs`：`Intro / Playing / HotStreak / Paused / Win / Lose` 状态已定义。
 - [x] `Core/RunController.cs`：重置并启动单局、下发 Balance、响应快乐/疲劳满值、停止输入与玩法并发出胜负事件。
 - [x] `RestartRun()` 已提供逻辑入口；实际重开按钮仍属于 C3 待实现 UI。
@@ -54,9 +57,9 @@
 ### A5. 连击与火热时间
 
 - [x] `Recommendation/ComboStreakCounter.cs`：正确累积、错误或超时清零；续连窗口按 `ComboBaseWindow`、`ComboWindowShrinkPerStreak`、`ComboMinWindow` 逐级缩短。
-- [x] `UI/ComboStreakView.cs`：连击大于 0 时显示 `当前/触发阈值`，归零时隐藏。
+- [x] `UI/ComboStreakView.cs`：streak≥1 时显示 HotBar + 当前连击数；续连窗口内随时间缩小；逐击 scale punch；火热开始时 ButtonIcon 代替数字并闪烁，Bar 持续抖动，结束时大抖后消失。
 - [x] `HotStreak/HotTimeController.cs`：仅按 `HotTriggerStreak` 连击阈值触发，不使用累计快乐条件。
-- [x] 同一根 `HotBar` 在 `Playing` 显示连击累积比例，满格进入 `HotStreak` 后改为 `HotTimeDuration` 倒计时。
+- [x] 同一根 `HotBar` 在 `Playing` 且 streak≥1 时显示连击累积比例，满格进入 `HotStreak` 后改为 `HotTimeDuration` 倒计时。
 - [x] 火热期间强制只抽当前兴趣 Topic；右滑固定增加 `HotHappinessPerSwipe`，左滑无收益也无惩罚。
 - [x] 火热期间不更新长期推荐权重、硬保底或连击；兴趣定时切换暂停。
 - [x] 火热结束后清除强制 Topic、切换一次兴趣，并在 `HotPostBufferDuration` 内禁用左右滑作为容错。
@@ -66,9 +69,10 @@
 
 ## B. 部分完成：场景与基础 UI
 
-- [x] `Assets/Scenes/SampleScene.unity` 已有手机/卡片区、钟摆与判定区、兴趣气泡、快乐条、疲劳条、HotBar、ComboNum。
+- [x] `Assets/Scenes/SampleScene.unity` 已有手机/卡片区、钟摆与判定区、兴趣气泡、快乐条（Fill + MiddleLayer 双向 lag）、疲劳条（Fill + MiddleLayer 三态 lead/pulse + 根节点 scaleY 蠕动）、HotBar、ComboNum。
 - [x] 当前基础 HUD 采用场景内联组件直接绑定，无需为了形式强制新增统一 `HUD.cs`。
-- [x] `HotBar` 的当前 UX 已确定：常显；累积阶段上涨，火热阶段下降。
+- [x] `HotBar` 的当前 UX 已确定：streak≥1 或火热倒计时期间显示；累积阶段随连击 scale 上涨，火热阶段持续抖动后大抖消失。
+- [x] `UI/EventBannerView.cs`：`HeavyEyesBanner` 在超级疲劳进入时弹出，`PerfectFeedBanner` 在火热时间开始时弹出；各显示 1.5s 后隐藏，等待下次触发；胜负/Intro 时强制收起。
 - [ ] 补齐主角/脸部画面区域（归入 juicy 表现，不阻塞基础逻辑闭环）。
 - [ ] 实现兴趣切换预告与切换动画；当前 `InterestBubbleView.HandleSwitchPreview` 为空。
 - [ ] 清理场景中重复系统组件，并将依赖 `FindObjectOfType` 的关键空引用改为显式绑定后做一次回归。
@@ -104,9 +108,13 @@
 
 ### C4. 基础音效
 
-- [ ] 加入最低限度音效：左右滑、正确/错误筛选、眨眼成功/失败、胜利/失败。
+- [x] `Audio/AudioManager.cs` + `Audio/RunAudioController.cs` + `Data/GameAudioConfig.asset`：SFX OneShot、单一主 BGM、疲劳阶段环境 Loop 叠层；`GameAudioConfig` 每条 Clip 配独立音量滑条（0–2）+ Master/SFX/BGM 总线。
+- [x] 音效槽位：快乐增/减音（`swipeCorrect`/`swipeWrong`，随 `HappinessMeter` 变化）、胜负、眨眼、疯狂疲劳、划手机、连击、兴趣、火热。
+- [x] 主 BGM `bgmMain` 整局播放；疲劳二/三阶段环境 Loop 跨阈值叠加（阈值 `ZonePhase2AtFatigue` / `ZonePhase3AtFatigue`）；淡入时长读 `GameBalanceConfig.GetBgmCrossfadeDuration`。
+- [x] 玩法事件补充：`FeedSpawner.OnSwipeJudged`、`HotTimeController.OnHotSwipe`。
+- [ ] **待资源**：在 `GameAudioConfig.asset` 挂载实际 Clip（`Assets/Audio/SFX/`、`Assets/Audio/BGM/`）。
 - [ ] 为钟摆加入基础节拍提示；确保不会掩盖眨眼判定反馈。
-- [ ] 火热时间至少有进入/结束提示音；复杂音乐变速与分层留到 D 区。
+- [ ] 火热时间环境叠层（`ambientHotStreak` 预留槽）留 D 区。
 
 ### C5. 内容素材
 
@@ -121,11 +129,12 @@
 - [ ] `Visual/FatigueVisuals.cs`：疲劳画面重影、模糊、变暗、变色、眼皮压低等；**疲劳画面属于 juicy，不作为当前逻辑阻塞项**。
 - [ ] `Visual/CharacterExpression.cs`：清醒、疲劳、火热、胜利、失败表情/状态。
 - [ ] 正确/错误筛选强化：手机发光、表情、轻微抖动、快乐变化反馈；现有卡片飞出动画作为基础保留。
-- [ ] 眨眼强化：自然眨眼、短暂清晰/变暗、判定区反馈；现有判定区闪烁作为基础保留。
+- [ ] 眨眼强化：自然眨眼、短暂清晰/变暗；判定区颜色闪烁（`PendulumController`）作为基础保留。
+- [x] 钟摆区域抖动（`Visual/PendulumFeedbackView.cs`：绿/黄圈上下抖、红圈/缩尽左右抖）。
 - [ ] 兴趣气泡预告抖动/闪烁与切换 scale pop。
 - [ ] 火热时间画面、火苗、节奏与音乐增强。
-- [ ] 环境音乐随疲劳变化，手机/钟摆/疲劳反馈音效分层。
-- [ ] 疯狂疲劳状态机（可延后）：连续完全失败触发、连续成功解除；`FatigueModifierSource.CrazyFatigue` 已预留。
+- [ ] 环境音乐随疲劳变化，手机/钟摆/疲劳反馈音效分层。（主 BGM + 阶段环境 Loop 叠层已实现；钟摆节拍与疲劳呼吸等待资源）
+- [x] 疯狂疲劳状态机：连续 3 次完全失败触发；成功/偏早/偏晚 1 次解除；红血丝等视觉 polish 仍待 `OnEntered`/`OnExited` 订阅。
 
 ---
 
@@ -161,5 +170,5 @@
 - [ ] 错误滑卡惩罚随疲劳略增但不过高；快乐与疲劳胜负不会同时重复触发。
 - [ ] 主玩法 Scene 常驻「教程 / 退出」按钮，可随时查看教程或返回菜单 Scene。
 - [ ] 菜单 Scene → 主玩法 Scene → 胜利/失败全屏页 →「重来」或「回到主菜单」，形成完整流程。
-- [ ] 基础音效能明确区分正确、错误、眨眼与胜负。
+- [ ] 基础音效能明确区分正确、错误、眨眼与胜负。（框架已接好，待挂载 Clip 后验收）
 - [ ] 单局节奏紧凑，可连续重玩；最后再进行 juicy 表现与数值平衡。

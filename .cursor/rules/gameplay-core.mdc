@@ -16,6 +16,8 @@ alwaysApply: true
 
 疲劳增速修饰按**来源**管理：同一来源（眨眼三态共用 `Blink`）在任意时刻只保留一个，**最新一次覆盖**上一次；不同来源之间才相乘叠加。因此连续失败只维持 ×2，不会 ×2→×4→×8 螺旋暴毙。
 
+**超级疲劳（CrazyFatigue）**：连续 3 次完全失败进入；额外疲劳增速（配置 `CrazyFatigueRateMultiplier`，与 Blink 相乘）+ 钟摆周期略快（`CrazyFatiguePendulumPeriodMultiplier`）；**1 次**绿圈成功或黄圈偏早/偏晚解除。
+
 ## 两大玩法（并行、注意力冲突）
 
 ### 1. 钟摆眨眼 — `Pendulum/`
@@ -65,6 +67,7 @@ Scripts/
   Recommendation/ TopicWeights, CardPicker
   HotStreak/      HotTimeController
   Visual/         FatigueVisuals, CharacterExpression
+  Audio/          AudioManager, RunAudioController, GameAudioConfig
   UI/             HUD, ResultsScreen, TutorialHints
   Data/           TopicId, CardSpriteLibrary, PickedCard
 ```

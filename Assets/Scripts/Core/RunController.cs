@@ -31,6 +31,8 @@ public class RunController : MonoBehaviour
     [SerializeField] SwipeFilterHandler swipeFilterHandler;
     [Tooltip("Hot time trigger, countdown, and forced-interest feed (Phase 6).")]
     [SerializeField] HotTimeController hotTimeController;
+    [Tooltip("Consecutive complete-miss crazy fatigue state.")]
+    [SerializeField] CrazyFatigueController crazyFatigueController;
 
     SwipeInput swipeInput;
     GameState stateBeforeTutorialPause;
@@ -71,6 +73,9 @@ public class RunController : MonoBehaviour
         if (hotTimeController == null)
             hotTimeController = FindObjectOfType<HotTimeController>();
 
+        if (crazyFatigueController == null)
+            crazyFatigueController = FindObjectOfType<CrazyFatigueController>();
+
         if (swipeInput == null)
             swipeInput = FindObjectOfType<SwipeInput>();
 
@@ -94,7 +99,6 @@ public class RunController : MonoBehaviour
         ApplyBalance();
         happinessMeter?.Reset();
         fatigueMeter?.Reset();
-        fatigueMeter?.ClearModifiers();
 
         pendulumController?.ResetState();
         pendulumController?.StartRunning();
@@ -102,6 +106,7 @@ public class RunController : MonoBehaviour
         topicWeights?.Reset();
         comboStreakCounter?.Reset();
         hotTimeController?.Reset();
+        crazyFatigueController?.Reset();
 
         SetState(GameState.Playing);
         fatigueMeter?.StartRunning();
@@ -201,6 +206,8 @@ public class RunController : MonoBehaviour
         if (!IsBlinkGameplayActive() || balanceConfig == null)
             return;
 
+        crazyFatigueController?.RegisterNonMissBlink();
+
         fatigueMeter?.ApplyRateModifier(
             FatigueModifierSource.Blink,
             balanceConfig.BlinkSuccessRateMultiplier,
@@ -214,6 +221,8 @@ public class RunController : MonoBehaviour
     {
         if (!IsBlinkGameplayActive() || balanceConfig == null)
             return;
+
+        crazyFatigueController?.RegisterNonMissBlink();
 
         fatigueMeter?.ApplyRateModifier(
             FatigueModifierSource.Blink,
@@ -236,6 +245,8 @@ public class RunController : MonoBehaviour
 
         Debug.Log("[RunController] 红圈按键失败：疲劳增速 ×"
                   + balanceConfig.BlinkMissRateMultiplier);
+
+        crazyFatigueController?.RegisterCompleteMiss();
     }
 
     void SubscribeMeters()
@@ -301,6 +312,7 @@ public class RunController : MonoBehaviour
         fatigueMeter?.ApplyBalance(balanceConfig);
         pendulumController?.ApplyBalance(balanceConfig);
         hotTimeController?.ApplyBalance(balanceConfig);
+        crazyFatigueController?.ApplyBalance(balanceConfig);
         comboStreakCounter?.ApplyBalance(balanceConfig);
 
         if (swipeFilterHandler != null)

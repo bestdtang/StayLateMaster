@@ -18,7 +18,7 @@ MonoBehaviour:
   _fatigueLateDampenStart: 52
   _fatigueLateDampenEndMultiplier: 0.62
   _pendulumSwingPeriod: 4.5
-  _pendulumMaxAngle: 45
+  _pendulumMaxAngle: 40
   _judgmentInnerHalfAngle: 12
   _judgmentOuterHalfAngle: 30
   _judgmentShrinkPerSecond: 3
@@ -36,6 +36,9 @@ MonoBehaviour:
   _blinkEarlyLateRateMultiplier: 0.9
   _blinkMissRateMultiplier: 1.75
   _blinkModifierDuration: 5
+  _crazyFatigueTriggerStreak: 3
+  _crazyFatigueRateMultiplier: 1.35
+  _crazyFatiguePendulumPeriodMultiplier: 0.92
   _minTopicWeight: 0.25
   _correctInterestRightWeightDelta: 0.35
   _correctSkipLeftWeightDelta: -0.15

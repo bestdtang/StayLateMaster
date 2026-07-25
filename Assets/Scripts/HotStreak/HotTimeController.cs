@@ -24,9 +24,7 @@ public class HotTimeController : MonoBehaviour
     [SerializeField] SwipeInput _swipeInput;
 
     [Header("Progress Bar")]
-    [Tooltip("进度条根物体；Playing 期间常显，累积上涨 / 火热倒计时共用。")]
-    [SerializeField] GameObject _barRoot;
-    [Tooltip("填充 Image：累积 = 连击/阈值，火热 = 剩余时间/总时长。")]
+    [Tooltip("填充 Image：累积 = 连击/阈值，火热 = 剩余时间/总时长。显隐由 ComboStreakView 管理。")]
     [SerializeField] Image _countdownFill;
 
     int _triggerStreak = 5;
@@ -45,6 +43,7 @@ public class HotTimeController : MonoBehaviour
 
     public event Action OnHotTimeStarted;
     public event Action OnHotTimeEnded;
+    public event Action<bool> OnHotSwipe;
 
     void Awake()
     {
@@ -128,7 +127,6 @@ public class HotTimeController : MonoBehaviour
         _hotStreakCountThisRun = 0;
         CancelPostHotBuffer(restoreInput: false);
         StopHotTimeInternal(switchInterest: false);
-        ShowBar();
         UpdateAccumulationBar(0);
     }
 
@@ -154,6 +152,8 @@ public class HotTimeController : MonoBehaviour
 
         if (wasCorrect && _happinessMeter != null)
             _happinessMeter.Add(_happinessPerSwipe);
+
+        OnHotSwipe?.Invoke(wasCorrect);
     }
 
     void HandleStreakChanged(int streak)
@@ -176,7 +176,6 @@ public class HotTimeController : MonoBehaviour
         if (_interestManager != null && _cardPicker != null)
             _cardPicker.SetForcedTopic(_interestManager.CurrentTopic);
 
-        ShowBar();
         UpdateHotTimeBar();
 
         _runController?.EnterHotStreak();
@@ -209,7 +208,6 @@ public class HotTimeController : MonoBehaviour
         _runController?.ExitHotStreak();
         OnHotTimeEnded?.Invoke();
 
-        ShowBar();
         UpdateAccumulationBar(_comboStreakCounter != null ? _comboStreakCounter.CurrentStreak : 0);
 
         if (switchInterest)
@@ -255,12 +253,6 @@ public class HotTimeController : MonoBehaviour
             CancelPostHotBuffer(restoreInput: false);
             StopHotTimeInternal(switchInterest: false);
         }
-    }
-
-    void ShowBar()
-    {
-        if (_barRoot != null)
-            _barRoot.SetActive(true);
     }
 
     void UpdateAccumulationBar(int streak)

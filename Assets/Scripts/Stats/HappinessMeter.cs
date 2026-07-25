@@ -15,11 +15,31 @@ public class HappinessMeter : MonoBehaviour
 
     float value;
     bool hasReachedMax;
+    bool fillDriveExternal;
 
     public float Value => value;
 
     public event Action<float> OnValueChanged;
     public event Action OnReachedMax;
+
+    /// <summary>
+    /// 为 true 时由外部视图驱动 fillImage.fillAmount（如 HappinessMiddleLayerView lag 动画）。
+    /// </summary>
+    public void SetFillDriveExternal(bool external)
+    {
+        fillDriveExternal = external;
+        if (!fillDriveExternal)
+            UpdateFill();
+    }
+
+    void OnDisable()
+    {
+        if (fillDriveExternal)
+        {
+            fillDriveExternal = false;
+            UpdateFill();
+        }
+    }
 
     public void Reset()
     {
@@ -62,7 +82,9 @@ public class HappinessMeter : MonoBehaviour
 
     void UpdateFill()
     {
-        if (fillImage != null)
-            fillImage.fillAmount = value / MaxValue;
+        if (fillDriveExternal || fillImage == null)
+            return;
+
+        fillImage.fillAmount = value / MaxValue;
     }
 }

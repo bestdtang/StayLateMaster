@@ -28,18 +28,24 @@ public class PendulumController : MonoBehaviour
     [SerializeField] Image judgmentZoneInnerMirror;
 
     [Header("Config & Stats")]
-    [Tooltip("Swing period, zone sizes, and shrink rate.")]
+    [Tooltip("Swing period, shrink rate, and gameplay judgment angles.")]
     [SerializeField] GameBalanceConfig balanceConfig;
     [Tooltip("Drives judgment-zone phase by current fatigue value.")]
     [SerializeField] FatigueMeter fatigueMeter;
 
     [Header("Arc Center UI")]
-    [Tooltip("Rect used for wedge diameter; defaults to this transform if empty.")]
-    [SerializeField] RectTransform arcReference;
     [Tooltip("Art-facing offset (degrees) added to bob rotation.")]
     [SerializeField] float bobRotationOffset;
 
+    [Header("Zone Visuals (Inspector / Scene)")]
+    [Tooltip("内圈扇形显示半宽（度）；仅 UI，眨眼判定仍读 GameBalanceConfig。")]
+    [SerializeField] float visualInnerHalfAngle = 13f;
+    [Tooltip("外圈扇形显示半宽（度）；仅 UI，眨眼判定仍读 GameBalanceConfig。")]
+    [SerializeField] float visualOuterHalfAngle = 22f;
+
     float bobPhaseRadians;
+    float visualInnerHalfAngleBase;
+    float visualOuterHalfAngleBase;
     float currentBobAngleDeg;
     float zoneCenterAngleDeg;
     float baseInnerHalfAngle;
@@ -54,6 +60,8 @@ public class PendulumController : MonoBehaviour
     JudgmentZonePhase lastPhase = JudgmentZonePhase.Centered;
 
     bool isRunning;
+
+    float crazyFatiguePeriodMultiplier = 1f;
 
     Color arcMaskBaseColor;
     Color innerBaseColor;
@@ -109,8 +117,9 @@ public class PendulumController : MonoBehaviour
         SetupRadialWedge(judgmentZoneOuter);
         SetupRadialWedge(judgmentZoneOuterMirror);
 
+        CacheVisualHalfAnglesFromInspectorOrScene();
+
         EnsureCenteredAtOrigin(pendulumBob);
-        EnsureCenteredAtOrigin(judgmentZoneRoot);
     }
 
     void OnDestroy()
@@ -145,12 +154,18 @@ public class PendulumController : MonoBehaviour
 
         KillZoneFlashTweens();
         RestoreZoneColors();
+        crazyFatiguePeriodMultiplier = 1f;
 
         if (balanceConfig != null)
             RefreshZoneSize();
 
         UpdateAngles();
         UpdateTransforms();
+    }
+
+    public void SetCrazyFatiguePeriodMultiplier(float multiplier)
+    {
+        crazyFatiguePeriodMultiplier = Mathf.Max(0.1f, multiplier);
     }
 
     public void StartRunning()
@@ -217,6 +232,9 @@ public class PendulumController : MonoBehaviour
             baseInnerHalfAngle);
         currentInnerHalfAngle = baseInnerHalfAngle;
         currentOuterHalfAngle = baseOuterHalfAngle;
+
+        visualInnerHalfAngleBase = visualInnerHalfAngle * sizeMultiplier;
+        visualOuterHalfAngleBase = Mathf.Max(visualOuterHalfAngle * sizeMultiplier, visualInnerHalfAngleBase);
     }
 
     void RefreshZoneAfterBlink()
@@ -394,15 +412,18 @@ public class PendulumController : MonoBehaviour
     float GetEffectiveSwingPeriod()
     {
         float basePeriod = balanceConfig.PendulumSwingPeriod;
+        float period = basePeriod;
         switch (GetCurrentPhase())
         {
             case JudgmentZonePhase.OppositeRandom:
-                return basePeriod * balanceConfig.PendulumPhase2PeriodMultiplier;
+                period = basePeriod * balanceConfig.PendulumPhase2PeriodMultiplier;
+                break;
             case JudgmentZonePhase.IrregularAccelSwing:
-                return basePeriod * balanceConfig.PendulumPhase3PeriodMultiplier;
-            default:
-                return basePeriod;
+                period = basePeriod * balanceConfig.PendulumPhase3PeriodMultiplier;
+                break;
         }
+
+        return period * crazyFatiguePeriodMultiplier;
     }
 
     float GetMaxZoneCenterAbsAngle()
@@ -421,7 +442,7 @@ public class PendulumController : MonoBehaviour
     void UpdateTransforms()
     {
         UpdatePendulumBobRotation();
-        UpdateZoneWedges(GetWedgeDiameter());
+        UpdateZoneWedges();
     }
 
     void UpdatePendulumBobRotation()
@@ -434,46 +455,51 @@ public class PendulumController : MonoBehaviour
             0f, 0f, -currentBobAngleDeg + bobRotationOffset);
     }
 
-    float GetWedgeDiameter()
-    {
-        RectTransform reference = arcReference != null ? arcReference : transform as RectTransform;
-        if (reference == null)
-            return 980f;
-
-        return reference.rect.width;
-    }
-
-    void UpdateZoneWedges(float diameter)
+    void UpdateZoneWedges()
     {
         // 与指针一致：逻辑角正=右侧，Unity UI 顺时针为负 Z（否则判定区会被镜像到指针同侧）
         if (judgmentZoneRoot != null)
             judgmentZoneRoot.localRotation = Quaternion.Euler(0f, 0f, -zoneCenterAngleDeg);
 
-        ApplySymmetricSector(
-            judgmentZoneOuter, judgmentZoneOuterMirror,
-            currentOuterHalfAngle, diameter);
-        ApplySymmetricSector(
-            judgmentZoneInner, judgmentZoneInnerMirror,
-            currentInnerHalfAngle, diameter);
+        float shrinkRatio = baseOuterHalfAngle > ZoneCollapseEpsilon
+            ? currentOuterHalfAngle / baseOuterHalfAngle
+            : 0f;
+
+        float displayOuterHalfAngle = visualOuterHalfAngleBase * shrinkRatio;
+        float displayInnerHalfAngle = visualInnerHalfAngleBase * shrinkRatio;
+
+        ApplySymmetricSector(judgmentZoneOuter, judgmentZoneOuterMirror, displayOuterHalfAngle);
+        ApplySymmetricSector(judgmentZoneInner, judgmentZoneInnerMirror, displayInnerHalfAngle);
     }
 
-    void ApplySymmetricSector(Image clockwiseHalf, Image counterClockwiseHalf, float halfAngleDeg, float diameter)
+    void ApplySymmetricSector(Image clockwiseHalf, Image counterClockwiseHalf, float halfAngleDeg)
     {
-        ApplyHalfWedge(clockwiseHalf, halfAngleDeg, diameter, clockwise: true);
-        ApplyHalfWedge(counterClockwiseHalf, halfAngleDeg, diameter, clockwise: false);
+        ApplyHalfWedge(clockwiseHalf, halfAngleDeg, clockwise: true);
+        ApplyHalfWedge(counterClockwiseHalf, halfAngleDeg, clockwise: false);
     }
 
-    void ApplyHalfWedge(Image image, float halfAngleDeg, float diameter, bool clockwise)
+    void ApplyHalfWedge(Image image, float halfAngleDeg, bool clockwise)
     {
         if (image == null)
             return;
 
-        RectTransform rect = image.rectTransform;
-        PrepareCenteredRect(rect, diameter);
-        rect.localRotation = Quaternion.identity;
-
+        image.rectTransform.localRotation = Quaternion.identity;
         image.fillClockwise = clockwise;
         image.fillAmount = halfAngleDeg / 360f;
+    }
+
+    void CacheVisualHalfAnglesFromInspectorOrScene()
+    {
+        if (visualInnerHalfAngle <= 0f && judgmentZoneInner != null)
+            visualInnerHalfAngle = judgmentZoneInner.fillAmount * 360f;
+
+        if (visualOuterHalfAngle <= 0f && judgmentZoneOuter != null)
+            visualOuterHalfAngle = judgmentZoneOuter.fillAmount * 360f;
+
+        visualInnerHalfAngle = Mathf.Max(0f, visualInnerHalfAngle);
+        visualOuterHalfAngle = Mathf.Max(visualOuterHalfAngle, visualInnerHalfAngle);
+        visualInnerHalfAngleBase = visualInnerHalfAngle;
+        visualOuterHalfAngleBase = visualOuterHalfAngle;
     }
 
     static void EnsureCenteredAtOrigin(RectTransform rect)

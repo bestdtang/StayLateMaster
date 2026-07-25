@@ -29,10 +29,10 @@ public class GameBalanceConfig : ScriptableObject
     [Tooltip("摆锤相对中心的最大摆角（度）。")]
     [SerializeField] private float _pendulumMaxAngle = 55f;
 
-    [Tooltip("内圈判定半宽（度）→ 成功。")]
+    [Tooltip("内圈判定半宽（度）→ 成功；仅逻辑判定，扇形 UI 由 PendulumController 的 Visual 字段控制。")]
     [SerializeField] private float _judgmentInnerHalfAngle = 8f;
 
-    [Tooltip("外圈判定半宽（度）→ 偏早/偏晚；须 ≥ 内圈。")]
+    [Tooltip("外圈判定半宽（度）→ 偏早/偏晚；须 ≥ 内圈；仅逻辑判定，扇形 UI 由 PendulumController 的 Visual 字段控制。")]
     [SerializeField] private float _judgmentOuterHalfAngle = 18f;
 
     [Tooltip("两次眨眼之间外圈半宽的缩小速率（度/秒）；缩到 0 且未按 = 完全失败。")]
@@ -82,6 +82,16 @@ public class GameBalanceConfig : ScriptableObject
 
     [Tooltip("眨眼增速修饰的默认持续时间（秒）。")]
     [SerializeField] private float _blinkModifierDuration = 4f;
+
+    [Header("Crazy Fatigue")]
+    [Tooltip("连续多少次完全失败进入超级疲劳。")]
+    [SerializeField] private int _crazyFatigueTriggerStreak = 3;
+
+    [Tooltip("超级疲劳额外疲劳增速倍率（与 Blink 修饰相乘）。")]
+    [SerializeField] private float _crazyFatigueRateMultiplier = 1.35f;
+
+    [Tooltip("超级疲劳期间钟摆周期倍率（<1 = 略快）。")]
+    [SerializeField] private float _crazyFatiguePendulumPeriodMultiplier = 0.92f;
 
     [Header("Recommendation (Topic Weights)")]
     [Tooltip("每个 Topic 的最小抽卡权重；防止任意 Topic 完全消失。")]
@@ -160,10 +170,30 @@ public class GameBalanceConfig : ScriptableObject
     public float PendulumPhase2PeriodMultiplier => _pendulumPhase2PeriodMultiplier;
     public float PendulumPhase3PeriodMultiplier => _pendulumPhase3PeriodMultiplier;
 
+    /// <summary>
+    /// BGM 阶段 crossfade 时长：与对应判定区阶段的钟摆一周时长一致（与 PendulumController 同源配置）。
+    /// </summary>
+    public float GetBgmCrossfadeDuration(BgmTrack track)
+    {
+        switch (track)
+        {
+            case BgmTrack.Phase2:
+                return _pendulumSwingPeriod * _pendulumPhase2PeriodMultiplier;
+            case BgmTrack.Phase3:
+                return _pendulumSwingPeriod * _pendulumPhase3PeriodMultiplier;
+            default:
+                return _pendulumSwingPeriod;
+        }
+    }
+
     public float BlinkSuccessRateMultiplier => _blinkSuccessRateMultiplier;
     public float BlinkEarlyLateRateMultiplier => _blinkEarlyLateRateMultiplier;
     public float BlinkMissRateMultiplier => _blinkMissRateMultiplier;
     public float BlinkModifierDuration => _blinkModifierDuration;
+
+    public int CrazyFatigueTriggerStreak => _crazyFatigueTriggerStreak;
+    public float CrazyFatigueRateMultiplier => _crazyFatigueRateMultiplier;
+    public float CrazyFatiguePendulumPeriodMultiplier => _crazyFatiguePendulumPeriodMultiplier;
 
     public float MinTopicWeight => _minTopicWeight;
     public float CorrectInterestRightWeightDelta => _correctInterestRightWeightDelta;

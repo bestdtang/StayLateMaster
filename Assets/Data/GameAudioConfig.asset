@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2, type: 3}
+  m_Name: GameAudioConfig
+  m_EditorClassIdentifier: 
+  _countdownStep32: {fileID: 8300000, guid: 4bc2923a4dd44c14a8f701c9129b4a42, type: 3}
+  _countdownStep32Volume: 1
+  _countdownStep1: {fileID: 8300000, guid: 1ddb236d2c0fdb946b8b84b73b7d3518, type: 3}
+  _countdownStep1Volume: 1
+  _victory: {fileID: 8300000, guid: cce4a6acfe970ef4e900d0906feb53fd, type: 3}
+  _victoryVolume: 1
+  _defeat: {fileID: 8300000, guid: 5f9235776ef79904a908f4c1980f25cd, type: 3}
+  _defeatVolume: 1
+  _blinkSuccess: {fileID: 8300000, guid: 7888784849813a441924af2553eb3996, type: 3}
+  _blinkSuccessVolume: 2
+  _blinkFail: {fileID: 8300000, guid: 5e3bf1b1b58679f439afd10982e28fd7, type: 3}
+  _blinkFailVolume: 1
+  _crazyFatigueEnter: {fileID: 8300000, guid: a48545b6a1d936841b0489b033110737, type: 3}
+  _crazyFatigueEnterVolume: 1.541
+  _crazyFatigueExit: {fileID: 8300000, guid: c02ee5c19851e6d43b24796248b9026b, type: 3}
+  _crazyFatigueExitVolume: 1
+  _crazyFatigueLoop: {fileID: 8300000, guid: 8b54d782d9f87e449bcf810b6f75f460, type: 3}
+  _crazyFatigueLoopVolume: 0.423
+  _phoneSwipe: {fileID: 8300000, guid: fba0436a80d4ccb48985262b235b3423, type: 3}
+  _phoneSwipeVolume: 1
+  _swipeCorrect: {fileID: 8300000, guid: 06d3b07eb352e6f43999edc59da8120a, type: 3}
+  _swipeCorrectVolume: 1
+  _swipeWrong: {fileID: 8300000, guid: bc7d04ec7228e7a47aea55d293171694, type: 3}
+  _swipeWrongVolume: 1
+  _interestChanged: {fileID: 8300000, guid: b934df8a59f7c3c4cb877a76a3f4176c, type: 3}
+  _interestChangedVolume: 1
+  _hotTimeEnter: {fileID: 8300000, guid: b40234f23ecde674ba656fc94684116f, type: 3}
+  _hotTimeEnterVolume: 2
+  _hotTimeSwipe: {fileID: 8300000, guid: 448f08a20ec64c146babcf4d32254320, type: 3}
+  _hotTimeSwipeVolume: 1
+  _hotTimeExit: {fileID: 8300000, guid: 34fdb3e34019c9949a2ba15dfbf17e40, type: 3}
+  _hotTimeExitVolume: 1
+  _comboTick: {fileID: 8300000, guid: 63667d490e14ff64c9aa060a9d00aba4, type: 3}
+  _comboTickVolume: 1
+  _bgmMain: {fileID: 8300000, guid: 344431099064abb4d9892ed0bb3e4cd7, type: 3}
+  _bgmMainVolume: 1
+  _ambientFatiguePhase2: {fileID: 8300000, guid: 9d515e44e8effeb468139d814ac3a722, type: 3}
+  _ambientFatiguePhase2Volume: 0.85
+  _ambientFatiguePhase3: {fileID: 8300000, guid: 95892e19859af954ab81da15b82c5490, type: 3}
+  _ambientFatiguePhase3Volume: 0.85
+  _ambientHotStreak: {fileID: 0}
+  _ambientHotStreakVolume: 1
+  _bgmFallbackFadeDuration: 1.5
+  _masterVolume: 1
+  _sfxVolume: 1
+  _bgmVolume: 1

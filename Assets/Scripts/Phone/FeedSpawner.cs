@@ -28,6 +28,7 @@ public class FeedSpawner : MonoBehaviour
     public CardView CurrentCardView => currentCard;
 
     public event Action<PickedCard, SwipeDirection> OnCardSwiped;
+    public event Action<bool> OnSwipeJudged;
 
     void Awake()
     {
@@ -110,6 +111,8 @@ public class FeedSpawner : MonoBehaviour
         bool wasCorrect = swipeFilterHandler != null
             ? swipeFilterHandler.ProcessSwipe(swipedCard, direction)
             : true;
+
+        OnSwipeJudged?.Invoke(wasCorrect);
 
         // 触发火热时，下一张已在 SetForcedTopic 之前生成，需立刻换成当前兴趣卡
         if (runController != null && runController.CurrentState == GameState.HotStreak)

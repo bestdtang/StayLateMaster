@@ -1,4 +1,5 @@
 using System.Collections;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,6 +15,8 @@ public class TutorialPageView : MonoBehaviour
 
     [Header("System References")]
     [SerializeField] RunController _runController;
+    [SerializeField] AudioManager _audioManager;
+    [SerializeField] GameAudioConfig _audioConfig;
 
     [Header("UI References")]
     [Tooltip("教程页根物体（仅切换显隐，脚本不要挂在此物体上）。")]
@@ -30,14 +33,23 @@ public class TutorialPageView : MonoBehaviour
     [Header("Timing")]
     [SerializeField] float _countdownStepDuration = 1f;
 
+    [Header("Countdown Juice")]
+    [SerializeField] float _countdownShakeDuration = 0.35f;
+    [SerializeField] float _countdownShakeStrength = 18f;
+
     bool _runStarted;
     bool _countdownRunning;
     bool _openedForReview;
+    RectTransform _countdownRect;
+    Vector2 _countdownRestAnchoredPosition;
 
     void Awake()
     {
         if (_runController == null)
             _runController = FindObjectOfType<RunController>();
+
+        if (_audioManager == null)
+            _audioManager = FindObjectOfType<AudioManager>();
 
         ResolvePageRoot();
         ResolveButtons();
@@ -49,6 +61,9 @@ public class TutorialPageView : MonoBehaviour
         if (_countdownRoot != null)
             _countdownRoot.SetActive(false);
 
+        if (_countdownText != null)
+            _countdownRect = _countdownText.rectTransform;
+
         SetExitButtonVisible(false);
         SetStartGameButtonVisible(true);
     }
@@ -56,6 +71,7 @@ public class TutorialPageView : MonoBehaviour
     void OnDestroy()
     {
         UnbindButtons();
+        _countdownRect?.DOKill();
     }
 
     void Start()
@@ -179,13 +195,19 @@ public class TutorialPageView : MonoBehaviour
         if (_countdownRoot != null)
             _countdownRoot.SetActive(true);
 
+        CacheCountdownRestPosition();
+
         for (int i = 3; i >= 1; i--)
         {
             if (_countdownText != null)
                 _countdownText.text = i.ToString();
 
+            PlayCountdownSfx(i);
+            PlayCountdownShake();
             yield return new WaitForSeconds(_countdownStepDuration);
         }
+
+        StopCountdownShake();
 
         if (_countdownRoot != null)
             _countdownRoot.SetActive(false);
@@ -193,6 +215,51 @@ public class TutorialPageView : MonoBehaviour
         _countdownRunning = false;
         _runStarted = true;
         _runController?.BeginRun();
+    }
+
+    void CacheCountdownRestPosition()
+    {
+        if (_countdownRect == null)
+            return;
+
+        _countdownRestAnchoredPosition = _countdownRect.anchoredPosition;
+    }
+
+    void PlayCountdownSfx(int step)
+    {
+        if (_audioManager == null || _audioConfig == null)
+            return;
+
+        GameAudioId id = step == 1 ? GameAudioId.CountdownStep1 : GameAudioId.CountdownStep32;
+        AudioClip clip = _audioConfig.GetClip(id);
+        if (clip == null)
+            return;
+
+        _audioManager.PlaySfx(clip, _audioConfig.GetVolume(id));
+    }
+
+    void PlayCountdownShake()
+    {
+        if (_countdownRect == null)
+            return;
+
+        _countdownRect.DOKill();
+        _countdownRect.anchoredPosition = _countdownRestAnchoredPosition;
+        _countdownRect.DOShakeAnchorPos(
+            _countdownShakeDuration,
+            _countdownShakeStrength,
+            vibrato: 50,
+            randomness: 90f,
+            fadeOut: true);
+    }
+
+    void StopCountdownShake()
+    {
+        if (_countdownRect == null)
+            return;
+
+        _countdownRect.DOKill();
+        _countdownRect.anchoredPosition = _countdownRestAnchoredPosition;
     }
 
     void SetPageVisible(bool visible)

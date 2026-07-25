@@ -50,6 +50,30 @@ public class FatigueMeter : MonoBehaviour
 
     public event Action<float> OnValueChanged;
     public event Action OnReachedMax;
+    public event Action OnModifiersChanged;
+
+    public bool TryGetBlinkRateMultiplier(out float multiplier)
+    {
+        if (TryGetActiveModifier(FatigueModifierSource.Blink, out RateModifier modifier))
+        {
+            multiplier = modifier.Multiplier;
+            return true;
+        }
+
+        multiplier = 1f;
+        return false;
+    }
+
+    public bool IsCrazyFatigueActive =>
+        TryGetActiveModifier(FatigueModifierSource.CrazyFatigue, out _);
+
+    public void ClearModifier(FatigueModifierSource source)
+    {
+        if (!activeModifiers.Remove(source))
+            return;
+
+        OnModifiersChanged?.Invoke();
+    }
 
     public void Reset()
     {
@@ -60,6 +84,7 @@ public class FatigueMeter : MonoBehaviour
         activeModifiers.Clear();
         UpdateFill();
         OnValueChanged?.Invoke(value);
+        OnModifiersChanged?.Invoke();
     }
 
     public void StartRunning()
@@ -84,13 +109,19 @@ public class FatigueMeter : MonoBehaviour
         activeModifiers[source] = new RateModifier
         {
             Multiplier = multiplier,
-            ExpiresAt = Time.time + duration
+            ExpiresAt = elapsedSeconds + duration
         };
+
+        OnModifiersChanged?.Invoke();
     }
 
     public void ClearModifiers()
     {
+        if (activeModifiers.Count == 0)
+            return;
+
         activeModifiers.Clear();
+        OnModifiersChanged?.Invoke();
     }
 
     /// <summary>
@@ -152,7 +183,7 @@ public class FatigueMeter : MonoBehaviour
 
     void RemoveExpiredModifiers()
     {
-        float now = Time.time;
+        float now = elapsedSeconds;
         expiredScratch.Clear();
 
         foreach (KeyValuePair<FatigueModifierSource, RateModifier> entry in activeModifiers)
@@ -163,6 +194,18 @@ public class FatigueMeter : MonoBehaviour
 
         for (int i = 0; i < expiredScratch.Count; i++)
             activeModifiers.Remove(expiredScratch[i]);
+
+        if (expiredScratch.Count > 0)
+            OnModifiersChanged?.Invoke();
+    }
+
+    bool TryGetActiveModifier(FatigueModifierSource source, out RateModifier modifier)
+    {
+        if (activeModifiers.TryGetValue(source, out modifier) && modifier.ExpiresAt > elapsedSeconds)
+            return true;
+
+        modifier = default;
+        return false;
     }
 
     void AddInternal(float amount)

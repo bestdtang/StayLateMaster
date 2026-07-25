@@ -217,17 +217,16 @@
 
 表现包括：
 
-- 主角眼球出现红血丝。
-- 疲劳增长速度进一步提高。
-- 画面变得更加压迫。
-- 钟摆声音变重。
-- 主角表情明显痛苦或强撑。
+- 主角眼球出现红血丝（视觉 polish 待接）。
+- 疲劳增长速度进一步提高（`FatigueModifierSource.CrazyFatigue`，与 Blink 修饰相乘）。
+- 钟摆指针摆动略快（`CrazyFatiguePendulumPeriodMultiplier`）。
+- 画面变得更加压迫、钟摆声音变重、主角表情痛苦（polish 待接）。
 
 解除条件：
 
-- 连续成功眨眼 3 次。
+- **1 次**绿圈成功 **或** 黄圈偏早/偏晚眨眼。
 
-解除过程中应有渐进反馈，例如红血丝逐步减轻、画面逐渐恢复。
+解除过程中渐进反馈（红血丝减轻等）为 polish，当前为硬切解除。
 
 ### 难度变化
 
@@ -477,12 +476,14 @@ MVP 当前以方向键滑卡为主；鼠标拖动可作为后续扩展。
 - 眼皮自然闭合并睁开。
 - 画面短暂清晰。
 - 钟摆判定区域发亮。
+- 钟摆区域（Arc）小幅上下抖动。
 
 ### 眨眼失败
 
 - 眼皮动作不自然或延迟。
 - 画面短暂变暗。
 - 主角眼睛更疲惫。
+- 钟摆区域（Arc）左右抖动。
 
 ### 火热时间
 
@@ -493,12 +494,36 @@ MVP 当前以方向键滑卡为主；鼠标拖动可作为后续扩展。
 
 ## 12. 音效与音乐
 
+### 当前实现（MVP 框架）
+
+运行时由 `Audio/RunAudioController` 订阅 gameplay 事件，经 `Audio/AudioManager` 播放；Clip 与**逐条音量**集中在 `Assets/Data/GameAudioConfig.asset`（每条音效 0–2，再乘 Master / SFX / BGM 总线）。
+
+| 类别 | 音效 | 触发 |
+|------|------|------|
+| 开局倒计时 | 3/2 / 1 | `TutorialPageView` 321 流程；3 与 2 共用 `countdownStep32`，1 用 `countdownStep1` |
+| 滑卡 | 划手机 / 快乐增 / 快乐减 | `SwipeInput.OnSwipe`；`HappinessMeter.OnValueChanged` 上升播 `swipeCorrect`、下降播 `swipeWrong`（无快乐变化不播；火热加快乐改播 `hotTimeSwipe`） |
+| 胜负 | 胜利 / 失败 | `RunController.OnGameWon` / `OnGameLost` |
+| 眨眼 | 绿圈 / 黄圈成功 / 红圈失败 | `OnBlinkSuccess`、`OnBlinkEarlyLate` 共用 `blinkSuccess`；`OnBlinkCompleteMiss` 播 `blinkFail` |
+| 疯狂疲劳 | 进入 / 持续 Loop / 解除 | `OnEntered` 播进入音并启动 Loop 叠层；`OnExited` 播解除音并停止 Loop（解除：任意 1 次绿/黄圈眨眼） |
+| 连击 | 连击 +1 | `ComboStreakCounter.OnStreakChanged` |
+| 兴趣 | 气泡更换 | `InterestManager.OnInterestChanged`（跳过开局首次） |
+| 火热 | 进入 / 刷篇 / 退出 | `HotTimeController` 三事件；刷篇仅右滑，用 `hotTimeSwipe` |
+| 主 BGM | 整局唯一 | `bgmMain` 进入玩法 Scene（教程页/Intro）即播放，321 倒计时期间不停；胜负 fade out |
+| 环境叠层 | 疲劳二/三阶段 | 跨 `ZonePhase2AtFatigue` / `ZonePhase3AtFatigue` 时**叠加**新 Loop（不替换主 BGM）；淡入时长 = 对应阶段钟摆一周 |
+| 叠层 Loop | 疯狂疲劳 | `crazyFatigueLoop` 叠在主 BGM 与环境层之上 |
+
+叠音规则：普通滑卡播「划手机」；**仅快乐实际变化时**再播增/减音。非兴趣左滑等判定正确但无快乐变化时不播增减音。火热右滑仅「划手机 + 火热刷篇」。疲劳阶段环境 Loop 与主 BGM 并行累积；疯狂疲劳 Loop 进入/解除各有一次 OneShot。
+
+胜负时主 BGM 与全部叠层 fade out；教程暂停（`GameState.Paused`）暂停主 BGM 与所有 Loop。
+
+### 设计方向（Juicy / 待资源）
+
 ### 环境音乐
 
 - 整体偏安静、深夜、低饱和。
 - 前期节奏较轻。
 - 疲劳越高，音乐越闷、越慢或越失真。
-- 火热时间时音乐突然加速并增强。
+- 火热时间时音乐突然加速并增强（`GameAudioConfig.bgmHotStreak` 预留，D 区实现）。
 
 ### 钟摆音效
 
@@ -572,6 +597,7 @@ MVP 当前以方向键滑卡为主；鼠标拖动可作为后续扩展。
 - 当前兴趣。
 - 手机内容卡片。
 - 火热时间剩余状态。
+- 超级疲劳 / 火热时间进入时各弹出对应 Banner（`HeavyEyesBanner` / `PerfectFeedBanner`），约 1.5s 后自动隐藏，等待下次进入再弹。
 
 ### 疲劳值表现
 
