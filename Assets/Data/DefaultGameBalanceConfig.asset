@@ -12,33 +12,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8e7d6c5b4a392817061554433221100, type: 3}
   m_Name: DefaultGameBalanceConfig
   m_EditorClassIdentifier: 
-  _fatigueBaseRate: 2
-  _fatigueAcceleration: 0.035
-  _fatigueMaxRate: 3
+  _fatigueBaseRate: 1.8
+  _fatigueAcceleration: 0.0315
+  _fatigueMaxRate: 2.7
   _fatigueLateDampenStart: 52
   _fatigueLateDampenEndMultiplier: 0.62
   _pendulumSwingPeriod: 4.5
   _pendulumMaxAngle: 40
-  _judgmentInnerHalfAngle: 12
-  _judgmentOuterHalfAngle: 30
-  _judgmentShrinkPerSecond: 3
-  _zonePhase2AtFatigue: 20
+  _judgmentInnerHalfAngle: 10
+  _judgmentOuterHalfAngle: 24
+  _judgmentShrinkPerSecond: 2.7
+  _zonePhase2AtFatigue: 15
   _zonePhase3AtFatigue: 60
-  _zonePhase2SizeMultiplier: 0.75
-  _zonePhase2MinCenterOffset: 12
+  _zonePhase2SizeMultiplier: 0.83
+  _zonePhase2MinCenterOffset: 8
   _zonePhase3SwingAmplitude: 24
-  _zonePhase3SwingOmega: 1.5
-  _zonePhase3IrregularAccelAmplitude: 3
-  _zonePhase3IrregularAccelSpeed: 1.5
-  _pendulumPhase2PeriodMultiplier: 0.85
-  _pendulumPhase3PeriodMultiplier: 0.7
+  _zonePhase3SwingOmega: 1.13
+  _zonePhase3IrregularAccelAmplitude: 2.7
+  _zonePhase3IrregularAccelSpeed: 1.35
+  _pendulumPhase2PeriodMultiplier: 0.87
+  _pendulumPhase3PeriodMultiplier: 0.73
   _blinkSuccessRateMultiplier: 0.6
   _blinkEarlyLateRateMultiplier: 0.9
-  _blinkMissRateMultiplier: 1.75
+  _blinkMissRateMultiplier: 1.68
   _blinkModifierDuration: 5
-  _crazyFatigueTriggerStreak: 3
-  _crazyFatigueRateMultiplier: 1.35
-  _crazyFatiguePendulumPeriodMultiplier: 0.92
+  _crazyFatigueTriggerStreak: 2
+  _crazyFatigueRateMultiplier: 1.32
+  _crazyFatiguePendulumPeriodMultiplier: 0.93
   _minTopicWeight: 0.25
   _correctInterestRightWeightDelta: 0.35
   _correctSkipLeftWeightDelta: -0.15
@@ -54,5 +54,6 @@ MonoBehaviour:
   _comboMinWindow: 1.2
   _hotTriggerStreak: 7
   _hotTimeDuration: 2
-  _hotHappinessPerSwipe: 0.5
+  _hotHappinessPerSwipe: 0.55
+  _hotPreBufferDuration: 0.4
   _hotPostBufferDuration: 0.25

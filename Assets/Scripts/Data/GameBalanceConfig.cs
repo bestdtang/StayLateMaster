@@ -145,6 +145,9 @@ public class GameBalanceConfig : ScriptableObject
     [Tooltip("火热时间内每次正确（右滑）固定增加的快乐值。")]
     [SerializeField] private float _hotHappinessPerSwipe = 6f;
 
+    [Tooltip("进入火热后进度条保持满格的开场缓冲（秒）；期间已可刷卡，倒计时尚未开始下降。")]
+    [SerializeField] private float _hotPreBufferDuration = 0.4f;
+
     [Tooltip("火热时间结束后，滑卡输入禁用的容错缓冲（秒）。")]
     [SerializeField] private float _hotPostBufferDuration = 0.6f;
 
@@ -214,5 +217,6 @@ public class GameBalanceConfig : ScriptableObject
     public int HotTriggerStreak => _hotTriggerStreak;
     public float HotTimeDuration => _hotTimeDuration;
     public float HotHappinessPerSwipe => _hotHappinessPerSwipe;
+    public float HotPreBufferDuration => _hotPreBufferDuration;
     public float HotPostBufferDuration => _hotPostBufferDuration;
 }

@@ -141,6 +141,9 @@ public class PendulumController : MonoBehaviour
     {
         balanceConfig = config;
         RefreshZoneSize();
+        // Intro / 倒计时期间尚未 StartRunning：扇形保持空，避免 ApplyBalance 把触发区刷满
+        if (!isRunning)
+            ClearJudgmentZone();
     }
 
     public void ResetState()
@@ -161,6 +164,16 @@ public class PendulumController : MonoBehaviour
 
         UpdateAngles();
         UpdateTransforms();
+    }
+
+    /// <summary>正式开局前：判定扇形逻辑与视觉半宽清零（弧轨仍显示）。</summary>
+    public void ClearJudgmentZone()
+    {
+        KillZoneFlashTweens();
+        RestoreZoneColors();
+        currentInnerHalfAngle = 0f;
+        currentOuterHalfAngle = 0f;
+        UpdateZoneWedges();
     }
 
     public void SetCrazyFatiguePeriodMultiplier(float multiplier)

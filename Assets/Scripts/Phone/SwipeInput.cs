@@ -27,10 +27,11 @@ public class SwipeInput : MonoBehaviour
         if (runController != null && !IsSwipeAllowedState(runController.CurrentState))
             return;
 
+        // 用 else if：避免同一帧左右键同时判定为 GetKeyDown 时，
+        // 一帧内误触发两次滑动（玩家只做了一次操作，却被判成两张卡）。
         if (Input.GetKeyDown(KeyCode.LeftArrow))
             OnSwipe?.Invoke(SwipeDirection.Left);
-
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        else if (Input.GetKeyDown(KeyCode.RightArrow))
             OnSwipe?.Invoke(SwipeDirection.Right);
     }
 

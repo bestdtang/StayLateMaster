@@ -134,6 +134,20 @@ public class HappinessMiddleLayerView : MonoBehaviour
             return;
         }
 
+        // 满值立刻贴满，避免 catch-up 期间看起来未满却已胜利。
+        if (newValue >= HappinessMeter.MaxValue)
+        {
+            StopCatchUpTweens();
+            _targetFill = 1f;
+            _lastDirection = LagDirection.None;
+            SetMiddleVisible(true);
+            if (_middleLayerImage != null)
+                _middleLayerImage.color = _gainColor;
+            SnapBoth(1f);
+            PlayGainPunch();
+            return;
+        }
+
         SetMiddleVisible(true);
 
         if (Mathf.Approximately(newTarget, _targetFill))
@@ -193,7 +207,9 @@ public class HappinessMiddleLayerView : MonoBehaviour
 
         if (_fillCatchUpTween != null && _fillCatchUpTween.IsActive())
         {
-            _fillCatchUpTween.ChangeEndValue(target, duration, false);
+            // snapStartValue 必须为 true：ChangeEndValue 会回卷 tween，
+            // 传 false 会让 fill 弹回本轮 tween 的原始起点，连续加快乐时永远追不上真实值。
+            _fillCatchUpTween.ChangeEndValue(target, duration, true);
             return;
         }
 
@@ -213,7 +229,7 @@ public class HappinessMiddleLayerView : MonoBehaviour
 
         if (_middleCatchUpTween != null && _middleCatchUpTween.IsActive())
         {
-            _middleCatchUpTween.ChangeEndValue(target, duration, false);
+            _middleCatchUpTween.ChangeEndValue(target, duration, true);
             return;
         }
 

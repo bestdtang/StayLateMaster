@@ -13,11 +13,11 @@ public enum FatigueModifierSource
 }
 
 /// <summary>
-/// 疲劳值 0–100，随时间加速增长，只增不减；满 100 触发失败条件。
+/// 疲劳值 0–102，随时间加速增长，只增不减；满 102 触发失败条件。
 /// </summary>
 public class FatigueMeter : MonoBehaviour
 {
-    public const float MaxValue = 100f;
+    public const float MaxValue = 102f;
 
     [Header("UI References")]
     [Tooltip("Filled Image showing fatigue progress (0–1 fillAmount).")]
@@ -163,7 +163,7 @@ public class FatigueMeter : MonoBehaviour
     }
 
     /// <summary>
-    /// 自然增速：随时间线性加速，带上限；疲劳 ≥50 后按当前值衰减，避免尾段过快填满。
+    /// 自然增速：随时间线性加速，带上限；疲劳 ≥ lateDampenStart 后按当前值衰减，避免尾段过快填满。
     /// </summary>
     float GetNaturalGrowthRate()
     {

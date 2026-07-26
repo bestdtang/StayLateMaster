@@ -126,9 +126,21 @@ public class FatigueMiddleLayerView : MonoBehaviour
         }
 
         _middleLayerImage.gameObject.SetActive(true);
-        _baseFillAmount = Mathf.Clamp01(value / FatigueMeter.MaxValue + _leadAmount);
+        _baseFillAmount = ComputeDisplayFill(value);
         ApplyFillAmountFromBreath();
         RefreshVisualState();
+    }
+
+    /// <summary>
+    /// 未达 MaxValue 时 lead/呼吸不得视觉顶死为 1.0；满值才贴满。
+    /// </summary>
+    float ComputeDisplayFill(float value)
+    {
+        if (value >= FatigueMeter.MaxValue)
+            return 1f;
+
+        float fill = value / FatigueMeter.MaxValue + _leadAmount;
+        return Mathf.Min(fill, 0.99f);
     }
 
     void RefreshVisualState()
@@ -290,7 +302,14 @@ public class FatigueMiddleLayerView : MonoBehaviour
 
         float amplitude = GetBreathAmplitude(_currentMode);
         float offset = Mathf.Lerp(-amplitude * 0.5f, amplitude * 0.5f, _breathPhase);
-        _middleLayerImage.fillAmount = Mathf.Clamp01(_baseFillAmount + offset);
+        float fill = _baseFillAmount + offset;
+
+        if (_fatigueMeter != null && _fatigueMeter.Value >= FatigueMeter.MaxValue)
+            fill = 1f;
+        else
+            fill = Mathf.Min(fill, 0.99f);
+
+        _middleLayerImage.fillAmount = Mathf.Clamp01(fill);
     }
 
     float GetBreathAmplitude(VisualMode mode)

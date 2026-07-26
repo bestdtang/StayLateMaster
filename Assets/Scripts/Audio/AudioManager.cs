@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 底层音频播放：SFX OneShot、单一主 BGM、命名环境音 Loop 叠层。
+/// 底层音频播放：SFX OneShot、单一主 BGM、命名环境音 Loop 叠层（疯狂疲劳等）。
+/// 跨 Scene 单例（DontDestroyOnLoad），便于开始菜单起播后进入玩法续播。
 /// </summary>
 [DisallowMultipleComponent]
 public class AudioManager : MonoBehaviour
 {
-    public const string AmbientPhase2Id = "fatigue_phase2";
-    public const string AmbientPhase3Id = "fatigue_phase3";
     public const string AmbientCrazyFatigueId = "crazy_fatigue";
+
+    static AudioManager _instance;
 
     [Header("Config")]
     [SerializeField] GameAudioConfig _config;
@@ -24,17 +25,108 @@ public class AudioManager : MonoBehaviour
     bool _isPaused;
     bool _mainBgmActive;
 
+    public static AudioManager Instance => _instance;
+
     public GameAudioConfig Config => _config;
     public bool IsMainBgmPlaying => _mainBgmActive && _mainBgmSource != null && _mainBgmSource.isPlaying;
 
+    /// <summary>获取或创建跨 Scene 持久的 AudioManager。</summary>
+    public static AudioManager GetOrCreate(GameAudioConfig config = null)
+    {
+        if (_instance != null)
+        {
+            if (config != null)
+                _instance.SetConfig(config);
+            return _instance;
+        }
+
+        AudioManager existing = FindObjectOfType<AudioManager>();
+        if (existing != null)
+        {
+            existing.PromoteToPersistent();
+            if (config != null)
+                existing.SetConfig(config);
+            return _instance;
+        }
+
+        var host = new GameObject("AudioManager");
+        DontDestroyOnLoad(host);
+        _instance = host.AddComponent<AudioManager>();
+        if (config != null)
+            _instance.SetConfig(config);
+        _instance.EnsureSources();
+        return _instance;
+    }
+
     void Awake()
     {
-        EnsureSources();
+        if (_instance != null && _instance != this)
+        {
+            if (_config != null)
+                _instance.SetConfig(_config);
+            Destroy(this);
+            return;
+        }
+
+        PromoteToPersistent();
+    }
+
+    void OnDestroy()
+    {
+        if (_instance == this)
+            _instance = null;
     }
 
     public void SetConfig(GameAudioConfig config)
     {
         _config = config;
+    }
+
+    /// <summary>
+    /// 成为跨 Scene 单例。若与 RunAudioController 等同 GO，则迁到独立持久对象，避免把玩法组件一并带走。
+    /// </summary>
+    void PromoteToPersistent()
+    {
+        if (_instance == this)
+        {
+            EnsureSources();
+            return;
+        }
+
+        if (_instance != null && _instance != this)
+        {
+            if (_config != null)
+                _instance.SetConfig(_config);
+            Destroy(this);
+            return;
+        }
+
+        bool sharedWithOthers = false;
+        MonoBehaviour[] behaviours = GetComponents<MonoBehaviour>();
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            if (behaviours[i] != null && behaviours[i] != this)
+            {
+                sharedWithOthers = true;
+                break;
+            }
+        }
+
+        if (sharedWithOthers)
+        {
+            var host = new GameObject("AudioManager");
+            DontDestroyOnLoad(host);
+            AudioManager persistent = host.AddComponent<AudioManager>();
+            // AddComponent 的 Awake 已把 _instance 设为 persistent
+            if (_config != null)
+                persistent.SetConfig(_config);
+            Destroy(this);
+            return;
+        }
+
+        _instance = this;
+        DontDestroyOnLoad(gameObject);
+        EnsureSources();
     }
 
     public void PlaySfx(AudioClip clip, float volumeScale = 1f)
@@ -89,7 +181,8 @@ public class AudioManager : MonoBehaviour
 
         _mainBgmActive = false;
 
-        if (fadeOut <= 0f || !_mainBgmSource.isPlaying)
+        // 未激活时无法 StartCoroutine，直接停
+        if (fadeOut <= 0f || !_mainBgmSource.isPlaying || !isActiveAndEnabled)
         {
             _mainBgmSource.Stop();
             return;
@@ -108,7 +201,7 @@ public class AudioManager : MonoBehaviour
                && source.isPlaying;
     }
 
-    /// <summary>叠加环境音 Loop（疲劳阶段 / 疯狂疲劳等），与主 BGM 并行。</summary>
+    /// <summary>叠加环境音 Loop（疯狂疲劳等），与主 BGM 并行。</summary>
     public void StartAmbientLoop(string layerId, AudioClip clip, float fadeIn = 0.3f, float volumeScale = 1f)
     {
         if (string.IsNullOrEmpty(layerId) || clip == null || _config == null)
@@ -126,7 +219,8 @@ public class AudioManager : MonoBehaviour
         source.clip = clip;
         source.loop = true;
 
-        if (fadeIn <= 0f)
+        // 未激活时无法 StartCoroutine，直接播满音量
+        if (fadeIn <= 0f || !isActiveAndEnabled)
         {
             source.volume = targetVolume;
             source.Play();
@@ -149,7 +243,8 @@ public class AudioManager : MonoBehaviour
 
         CancelAmbientFade(layerId);
 
-        if (fadeOut <= 0f || !source.isPlaying)
+        // 未激活时无法 StartCoroutine，直接停
+        if (fadeOut <= 0f || !source.isPlaying || !isActiveAndEnabled)
         {
             source.Stop();
             return;

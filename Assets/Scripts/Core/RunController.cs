@@ -13,7 +13,7 @@ public class RunController : MonoBehaviour
     [Header("System References")]
     [Tooltip("Happiness 0–100; win at max.")]
     [SerializeField] HappinessMeter happinessMeter;
-    [Tooltip("Fatigue 0–100; lose at max.")]
+    [Tooltip("Fatigue 0–102; lose at max.")]
     [SerializeField] FatigueMeter fatigueMeter;
     [Tooltip("Pendulum swing and judgment zones.")]
     [SerializeField] PendulumController pendulumController;
@@ -88,6 +88,11 @@ public class RunController : MonoBehaviour
         SubscribeMeters();
     }
 
+    void LateUpdate()
+    {
+        EvaluateEndGame();
+    }
+
     void OnDestroy()
     {
         UnsubscribeMeters();
@@ -114,9 +119,25 @@ public class RunController : MonoBehaviour
         feedSpawner?.ResetAndSpawn();
     }
 
+    /// <summary>
+    /// 结算重开入口：切回 Intro 并停住玩法，由 TutorialPageView 播 321 后再 BeginRun。
+    /// </summary>
     public void RestartRun()
     {
-        BeginRun();
+        PrepareRestartCountdown();
+    }
+
+    /// <summary>胜负后重开倒计时前：清场并回到 Intro，避免玩法仍按 Win/Lose 跑。</summary>
+    public void PrepareRestartCountdown()
+    {
+        fatigueMeter?.StopRunning();
+        pendulumController?.StopRunning();
+        feedSpawner?.StopFeed();
+        interestManager?.Stop();
+        hotTimeController?.Reset();
+        crazyFatigueController?.Reset();
+        comboStreakCounter?.Reset();
+        SetState(GameState.Intro);
     }
 
     /// <summary>局内教程 overlay 打开时暂停玩法（计时、钟摆、滑卡等）。</summary>
@@ -252,45 +273,72 @@ public class RunController : MonoBehaviour
     void SubscribeMeters()
     {
         if (happinessMeter != null)
-            happinessMeter.OnReachedMax += HandleHappinessMax;
+            happinessMeter.OnReachedMax += HandleMeterReachedMax;
 
         if (fatigueMeter != null)
-            fatigueMeter.OnReachedMax += HandleFatigueMax;
+            fatigueMeter.OnReachedMax += HandleMeterReachedMax;
     }
 
     void UnsubscribeMeters()
     {
         if (happinessMeter != null)
-            happinessMeter.OnReachedMax -= HandleHappinessMax;
+            happinessMeter.OnReachedMax -= HandleMeterReachedMax;
 
         if (fatigueMeter != null)
-            fatigueMeter.OnReachedMax -= HandleFatigueMax;
+            fatigueMeter.OnReachedMax -= HandleMeterReachedMax;
     }
 
-    void HandleHappinessMax()
+    void HandleMeterReachedMax()
     {
+        EvaluateEndGame();
+    }
+
+    /// <summary>
+    /// 集中胜负判定：同帧双满时快乐优先。
+    /// </summary>
+    void EvaluateEndGame()
+    {
+        if (currentState == GameState.Win || currentState == GameState.Lose)
+            return;
+
+        if (currentState != GameState.Playing && currentState != GameState.HotStreak)
+            return;
+
+        bool happyMax = happinessMeter != null
+            && happinessMeter.Value >= HappinessMeter.MaxValue;
+        bool fatigueMax = fatigueMeter != null
+            && fatigueMeter.Value >= FatigueMeter.MaxValue;
+
+        if (happyMax)
+            EndRun(GameState.Win);
+        else if (fatigueMax)
+            EndRun(GameState.Lose);
+    }
+
+    void EndRun(GameState result)
+    {
+        if (result != GameState.Win && result != GameState.Lose)
+            return;
+
         if (currentState == GameState.Win || currentState == GameState.Lose)
             return;
 
         fatigueMeter?.StopRunning();
         pendulumController?.StopRunning();
         feedSpawner?.StopFeed();
-        SetState(GameState.Win);
-        Debug.Log("[RunController] 胜利：快乐值已满。");
-        OnGameWon?.Invoke();
-    }
+        interestManager?.Stop();
+        SetState(result);
 
-    void HandleFatigueMax()
-    {
-        if (currentState == GameState.Win || currentState == GameState.Lose)
-            return;
-
-        fatigueMeter?.StopRunning();
-        pendulumController?.StopRunning();
-        feedSpawner?.StopFeed();
-        SetState(GameState.Lose);
-        Debug.Log("[RunController] 失败：疲劳值已满。");
-        OnGameLost?.Invoke();
+        if (result == GameState.Win)
+        {
+            Debug.Log($"[RunController] 胜利：快乐值已满。Happiness={happinessMeter?.Value:F2} Fatigue={fatigueMeter?.Value:F2}");
+            OnGameWon?.Invoke();
+        }
+        else
+        {
+            Debug.Log($"[RunController] 失败：疲劳值已满。Happiness={happinessMeter?.Value:F2} Fatigue={fatigueMeter?.Value:F2}");
+            OnGameLost?.Invoke();
+        }
     }
 
     bool IsBlinkGameplayActive()

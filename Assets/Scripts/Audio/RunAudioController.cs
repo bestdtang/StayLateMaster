@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 订阅 gameplay 事件，驱动 SFX、主 BGM 与疲劳阶段环境音叠层。
+/// 订阅 gameplay 事件，驱动 SFX、主 BGM、疯狂疲劳 Loop 与疲劳阶段打哈气。
 /// </summary>
 [DisallowMultipleComponent]
 public class RunAudioController : MonoBehaviour
@@ -25,14 +25,12 @@ public class RunAudioController : MonoBehaviour
     int _lastComboStreak;
     bool _interestInitialized;
     FatigueAudioPhase _currentFatiguePhase = FatigueAudioPhase.Phase1;
+    float _fatigueYawnTimer;
 
     void Awake()
     {
-        if (_audioManager == null)
-            _audioManager = GetComponent<AudioManager>();
-
-        if (_audioManager == null)
-            _audioManager = FindObjectOfType<AudioManager>();
+        // 优先用跨 Scene 单例（开始菜单已起播的 BGM）；场景内重复组件会被销毁
+        _audioManager = AudioManager.GetOrCreate(_audioConfig);
 
         if (_runController == null)
             _runController = FindObjectOfType<RunController>();
@@ -72,13 +70,20 @@ public class RunAudioController : MonoBehaviour
 
     void Start()
     {
-        TryStartMainBgm();
+        // 菜单已起播则只改音量；Intro 时压低，避免先满音再突然变小
+        TryStartMainBgm(duckForTutorial: IsInIntro());
+    }
+
+    void Update()
+    {
+        TickFatigueYawn();
     }
 
     void OnDisable()
     {
         UnsubscribeAll();
-        _audioManager?.StopAllAmbientLoops();
+        // 禁用时对象可能已 inactive，fade 会触发 coroutine 报错，直接停
+        _audioManager?.StopAllAmbientLoops(fadeOut: 0f);
     }
 
     void SubscribeAll()
@@ -179,7 +184,7 @@ public class RunAudioController : MonoBehaviour
                 ResetRunAudio();
                 break;
             case GameState.Paused:
-                _audioManager?.SetPaused(true);
+                // 教程 overlay：玩法暂停，但 BGM 继续（由 TutorialPageView 压低音量并播 OneShot）
                 break;
             case GameState.HotStreak:
                 _audioManager?.SetPaused(false);
@@ -197,15 +202,16 @@ public class RunAudioController : MonoBehaviour
         _lastHappiness = _happinessMeter != null ? _happinessMeter.Value : 0f;
         _interestInitialized = false;
         _currentFatiguePhase = FatigueAudioPhase.Phase1;
+        _fatigueYawnTimer = 0f;
 
         _audioManager?.SetPaused(false);
         _audioManager?.StopAllAmbientLoops(fadeOut: 0f);
 
         TryStartMainBgm();
-        RefreshFatigueAmbients(force: true);
+        RefreshFatigueYawnPhase(force: true);
     }
 
-    void TryStartMainBgm()
+    void TryStartMainBgm(bool duckForTutorial = false)
     {
         if (_audioConfig == null)
             return;
@@ -214,7 +220,16 @@ public class RunAudioController : MonoBehaviour
         if (clip == null)
             return;
 
-        _audioManager?.StartMainBgm(clip, _audioConfig.GetVolume(GameAudioId.BgmMain));
+        float volumeScale = _audioConfig.GetVolume(GameAudioId.BgmMain);
+        if (duckForTutorial)
+            volumeScale *= _audioConfig.IntroTutorialBgmVolumeScale;
+
+        _audioManager?.StartMainBgm(clip, volumeScale);
+    }
+
+    bool IsInIntro()
+    {
+        return _runController != null && _runController.CurrentState == GameState.Intro;
     }
 
     void HandleGameWon()
@@ -234,6 +249,8 @@ public class RunAudioController : MonoBehaviour
         float fade = _audioConfig != null ? _audioConfig.BgmFallbackFadeDuration : 0.5f;
         _audioManager?.StopAllAmbientLoops(fade);
         _audioManager?.StopMainBgm(fade);
+        _fatigueYawnTimer = 0f;
+        _currentFatiguePhase = FatigueAudioPhase.Phase1;
     }
 
     void HandleHappinessChanged(float value)
@@ -261,7 +278,7 @@ public class RunAudioController : MonoBehaviour
 
     void HandleFatigueChanged(float value)
     {
-        RefreshFatigueAmbients(force: false);
+        RefreshFatigueYawnPhase(force: false);
     }
 
     void HandleBlinkSuccess()
@@ -290,7 +307,7 @@ public class RunAudioController : MonoBehaviour
         StartAmbientLoop(
             AudioManager.AmbientCrazyFatigueId,
             GameAudioId.CrazyFatigueLoop,
-            GetAmbientFadeIn(FatigueAudioPhase.Phase3));
+            GetCrazyFatigueLoopFadeIn());
     }
 
     void HandleCrazyFatigueExited()
@@ -344,9 +361,9 @@ public class RunAudioController : MonoBehaviour
         PlaySfx(GameAudioId.PhoneSwipe);
     }
 
-    void RefreshFatigueAmbients(bool force)
+    void RefreshFatigueYawnPhase(bool force)
     {
-        if (_audioManager == null || _fatigueMeter == null || _runController == null || _audioConfig == null)
+        if (_audioConfig == null || _runController == null)
             return;
 
         GameState state = _runController.CurrentState;
@@ -354,26 +371,42 @@ public class RunAudioController : MonoBehaviour
             return;
 
         FatigueAudioPhase targetPhase = ResolveFatiguePhase();
-
         if (!force && targetPhase == _currentFatiguePhase)
             return;
 
+        bool enteredYawnPhase = targetPhase > _currentFatiguePhase
+                                && targetPhase >= FatigueAudioPhase.Phase2;
+
         _currentFatiguePhase = targetPhase;
+        _fatigueYawnTimer = 0f;
 
-        if (targetPhase >= FatigueAudioPhase.Phase2)
-            TryStartPhaseAmbient(FatigueAudioPhase.Phase2, AudioManager.AmbientPhase2Id);
-
-        if (targetPhase >= FatigueAudioPhase.Phase3)
-            TryStartPhaseAmbient(FatigueAudioPhase.Phase3, AudioManager.AmbientPhase3Id);
+        // 跨入二/三阶段时立刻打一次哈气，之后按间隔重复
+        if (enteredYawnPhase)
+            PlaySfx(GameAudioId.FatigueYawn);
     }
 
-    void TryStartPhaseAmbient(FatigueAudioPhase phase, string layerId)
+    void TickFatigueYawn()
     {
-        if (_audioManager.IsAmbientLoopPlaying(layerId))
+        if (_audioConfig == null || _runController == null)
             return;
 
-        GameAudioId audioId = _audioConfig.GetAmbientAudioId(phase);
-        StartAmbientLoop(layerId, audioId, GetAmbientFadeIn(phase));
+        GameState state = _runController.CurrentState;
+        if (state != GameState.Playing && state != GameState.HotStreak)
+            return;
+
+        if (_currentFatiguePhase < FatigueAudioPhase.Phase2)
+            return;
+
+        float interval = _audioConfig.GetFatigueYawnInterval(_currentFatiguePhase);
+        if (interval <= 0f)
+            return;
+
+        _fatigueYawnTimer += Time.deltaTime;
+        if (_fatigueYawnTimer < interval)
+            return;
+
+        _fatigueYawnTimer = 0f;
+        PlaySfx(GameAudioId.FatigueYawn);
     }
 
     void StartAmbientLoop(string layerId, GameAudioId audioId, float fadeIn)
@@ -404,20 +437,13 @@ public class RunAudioController : MonoBehaviour
         return FatigueAudioPhase.Phase1;
     }
 
-    float GetAmbientFadeIn(FatigueAudioPhase phase)
+    float GetCrazyFatigueLoopFadeIn()
     {
         GameBalanceConfig balance = _runController != null ? _runController.BalanceConfig : null;
         if (balance == null)
             return _audioConfig != null ? _audioConfig.BgmFallbackFadeDuration : 1.5f;
 
-        BgmTrack track = phase switch
-        {
-            FatigueAudioPhase.Phase2 => BgmTrack.Phase2,
-            FatigueAudioPhase.Phase3 => BgmTrack.Phase3,
-            _ => BgmTrack.LowFatigue
-        };
-
-        return balance.GetBgmCrossfadeDuration(track);
+        return balance.GetBgmCrossfadeDuration(BgmTrack.Phase3);
     }
 
     void PlaySfx(GameAudioId id)

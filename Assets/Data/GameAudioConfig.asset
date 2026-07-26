@@ -12,10 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2, type: 3}
   m_Name: GameAudioConfig
   m_EditorClassIdentifier: 
+  _tutorialIntro: {fileID: 8300000, guid: 8b6f057ad57705640a48c29cbedd1f17, type: 3}
+  _tutorialIntroVolume: 1
+  _introTutorialBgmVolumeScale: 0.3
   _countdownStep32: {fileID: 8300000, guid: 4bc2923a4dd44c14a8f701c9129b4a42, type: 3}
-  _countdownStep32Volume: 1
+  _countdownStep32Volume: 0.5
   _countdownStep1: {fileID: 8300000, guid: 1ddb236d2c0fdb946b8b84b73b7d3518, type: 3}
-  _countdownStep1Volume: 1
+  _countdownStep1Volume: 0.5
   _victory: {fileID: 8300000, guid: cce4a6acfe970ef4e900d0906feb53fd, type: 3}
   _victoryVolume: 1
   _defeat: {fileID: 8300000, guid: 5f9235776ef79904a908f4c1980f25cd, type: 3}
@@ -48,13 +51,13 @@ MonoBehaviour:
   _comboTickVolume: 1
   _bgmMain: {fileID: 8300000, guid: 344431099064abb4d9892ed0bb3e4cd7, type: 3}
   _bgmMainVolume: 1
-  _ambientFatiguePhase2: {fileID: 8300000, guid: 9d515e44e8effeb468139d814ac3a722, type: 3}
-  _ambientFatiguePhase2Volume: 0.85
-  _ambientFatiguePhase3: {fileID: 8300000, guid: 95892e19859af954ab81da15b82c5490, type: 3}
-  _ambientFatiguePhase3Volume: 0.85
   _ambientHotStreak: {fileID: 0}
   _ambientHotStreakVolume: 1
   _bgmFallbackFadeDuration: 1.5
+  _fatigueYawn: {fileID: 8300000, guid: 80daa48f1c93c8640906640629b66e6a, type: 3}
+  _fatigueYawnVolume: 1
+  _fatigueYawnIntervalPhase2: 10
+  _fatigueYawnIntervalPhase3: 5
   _masterVolume: 1
   _sfxVolume: 1
   _bgmVolume: 1

@@ -7,6 +7,13 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "GameAudioConfig", menuName = "StayLate/Game Audio Config")]
 public class GameAudioConfig : ScriptableObject
 {
+    [Header("Intro Tutorial")]
+    [Tooltip("进入玩法 Scene、首次教程 overlay 打开时播放一次。")]
+    [SerializeField] AudioClip _tutorialIntro;
+    [SerializeField, Range(0f, 2f)] float _tutorialIntroVolume = 1f;
+    [Tooltip("首次教程打开期间，主 BGM 相对正常音量的倍率。")]
+    [SerializeField, Range(0f, 1f)] float _introTutorialBgmVolumeScale = 0.6f;
+
     [Header("Intro Countdown")]
     [Tooltip("开局 321 倒计时：3 与 2 共用。")]
     [SerializeField] AudioClip _countdownStep32;
@@ -58,20 +65,23 @@ public class GameAudioConfig : ScriptableObject
     [SerializeField, Range(0f, 2f)] float _comboTickVolume = 1f;
 
     [Header("BGM")]
-    [Tooltip("整局唯一主 BGM，从开始到结束持续播放。")]
+    [Tooltip("主 BGM：开始菜单起播，跨 Scene 续播；入场教程压低，胜负 fade out。")]
     [SerializeField] AudioClip _bgmMain;
     [SerializeField, Range(0f, 2f)] float _bgmMainVolume = 1f;
-    [Tooltip("疲劳进入二阶段时叠加的环境音 Loop。")]
-    [SerializeField] AudioClip _ambientFatiguePhase2;
-    [SerializeField, Range(0f, 2f)] float _ambientFatiguePhase2Volume = 0.85f;
-    [Tooltip("疲劳进入三阶段时叠加的环境音 Loop（与二阶段 Loop 并存）。")]
-    [SerializeField] AudioClip _ambientFatiguePhase3;
-    [SerializeField, Range(0f, 2f)] float _ambientFatiguePhase3Volume = 0.85f;
     [Tooltip("预留：火热时间环境叠层（D 区 polish）。")]
     [SerializeField] AudioClip _ambientHotStreak;
     [SerializeField, Range(0f, 2f)] float _ambientHotStreakVolume = 1f;
     [Tooltip("胜负时主 BGM 淡出时长（秒）。")]
     [SerializeField] float _bgmFallbackFadeDuration = 1.5f;
+
+    [Header("Fatigue Yawn")]
+    [Tooltip("疲劳二/三阶段间歇播放的打哈气音效。")]
+    [SerializeField] AudioClip _fatigueYawn;
+    [SerializeField, Range(0f, 2f)] float _fatigueYawnVolume = 1f;
+    [Tooltip("二阶段打哈气间隔（秒）。")]
+    [SerializeField] float _fatigueYawnIntervalPhase2 = 10f;
+    [Tooltip("三阶段打哈气间隔（秒）。")]
+    [SerializeField] float _fatigueYawnIntervalPhase3 = 5f;
 
     [Header("Volume Buses")]
     [SerializeField, Range(0f, 1f)] float _masterVolume = 1f;
@@ -79,6 +89,7 @@ public class GameAudioConfig : ScriptableObject
     [SerializeField, Range(0f, 1f)] float _bgmVolume = 0.6f;
 
     public float BgmFallbackFadeDuration => _bgmFallbackFadeDuration;
+    public float IntroTutorialBgmVolumeScale => _introTutorialBgmVolumeScale;
     public float MasterVolume => _masterVolume;
     public float SfxVolume => _sfxVolume;
     public float BgmVolume => _bgmVolume;
@@ -87,6 +98,7 @@ public class GameAudioConfig : ScriptableObject
     {
         switch (id)
         {
+            case GameAudioId.TutorialIntro: return _tutorialIntro;
             case GameAudioId.CountdownStep32: return _countdownStep32;
             case GameAudioId.CountdownStep1: return _countdownStep1;
             case GameAudioId.Victory: return _victory;
@@ -105,8 +117,7 @@ public class GameAudioConfig : ScriptableObject
             case GameAudioId.HotTimeExit: return _hotTimeExit;
             case GameAudioId.ComboTick: return _comboTick;
             case GameAudioId.BgmMain: return _bgmMain;
-            case GameAudioId.AmbientFatiguePhase2: return _ambientFatiguePhase2;
-            case GameAudioId.AmbientFatiguePhase3: return _ambientFatiguePhase3;
+            case GameAudioId.FatigueYawn: return _fatigueYawn;
             case GameAudioId.AmbientHotStreak: return _ambientHotStreak;
             default: return null;
         }
@@ -116,6 +127,7 @@ public class GameAudioConfig : ScriptableObject
     {
         switch (id)
         {
+            case GameAudioId.TutorialIntro: return _tutorialIntroVolume;
             case GameAudioId.CountdownStep32: return _countdownStep32Volume;
             case GameAudioId.CountdownStep1: return _countdownStep1Volume;
             case GameAudioId.Victory: return _victoryVolume;
@@ -134,8 +146,7 @@ public class GameAudioConfig : ScriptableObject
             case GameAudioId.HotTimeExit: return _hotTimeExitVolume;
             case GameAudioId.ComboTick: return _comboTickVolume;
             case GameAudioId.BgmMain: return _bgmMainVolume;
-            case GameAudioId.AmbientFatiguePhase2: return _ambientFatiguePhase2Volume;
-            case GameAudioId.AmbientFatiguePhase3: return _ambientFatiguePhase3Volume;
+            case GameAudioId.FatigueYawn: return _fatigueYawnVolume;
             case GameAudioId.AmbientHotStreak: return _ambientHotStreakVolume;
             default: return 1f;
         }
@@ -151,21 +162,16 @@ public class GameAudioConfig : ScriptableObject
         return _masterVolume * _bgmVolume * GetVolume(id);
     }
 
-    public GameAudioId GetAmbientAudioId(FatigueAudioPhase phase)
+    public float GetFatigueYawnInterval(FatigueAudioPhase phase)
     {
         switch (phase)
         {
-            case FatigueAudioPhase.Phase2:
-                return GameAudioId.AmbientFatiguePhase2;
             case FatigueAudioPhase.Phase3:
-                return GameAudioId.AmbientFatiguePhase3;
+                return Mathf.Max(0.1f, _fatigueYawnIntervalPhase3);
+            case FatigueAudioPhase.Phase2:
+                return Mathf.Max(0.1f, _fatigueYawnIntervalPhase2);
             default:
-                return GameAudioId.AmbientFatiguePhase2;
+                return 0f;
         }
-    }
-
-    public AudioClip GetAmbientClip(FatigueAudioPhase phase)
-    {
-        return GetClip(GetAmbientAudioId(phase));
     }
 }

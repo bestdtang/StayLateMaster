@@ -3,6 +3,7 @@
 /// </summary>
 public enum GameAudioId
 {
+    TutorialIntro,
     CountdownStep32,
     CountdownStep1,
     Victory,
@@ -21,7 +22,6 @@ public enum GameAudioId
     HotTimeExit,
     ComboTick,
     BgmMain,
-    AmbientFatiguePhase2,
-    AmbientFatiguePhase3,
+    FatigueYawn,
     AmbientHotStreak
 }

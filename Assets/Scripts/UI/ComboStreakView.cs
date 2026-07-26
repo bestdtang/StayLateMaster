@@ -2,11 +2,11 @@ using System;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// 连击 HUD（HotBar + ComboNum）：streak≥1 时显示；连击越高 scale 上限越大，
-/// 火热开始时 ButtonIcon 代替连击数字并闪烁，HotBar 大幅 scale duang 后进入持续抖动；结束时大抖后消失。
+/// 火热开始时 ButtonIcon 代替连击数字（动画由 Icon 自身 Animation 负责），
+/// HotCount 统计火热右滑次数并随次数放大；HotBar 开场剧烈抖动后持续轻抖；结束时大抖后消失。
 /// </summary>
 public class ComboStreakView : MonoBehaviour
 {
@@ -15,8 +15,10 @@ public class ComboStreakView : MonoBehaviour
     [SerializeField] GameObject _displayRoot;
     [Tooltip("显示当前连击数 TextMeshPro。")]
     [SerializeField] TMP_Text _streakText;
-    [Tooltip("火热时间开始时显示并代替连击数字（HotBar 上的 ButtonIcon）。")]
+    [Tooltip("火热时间开始时显示并代替连击数字（HotBar 上的 ButtonIcon）；闪烁等动效由自身 Animation 控制。")]
     [SerializeField] GameObject _hotReadyIcon;
+    [Tooltip("火热期间右滑次数 TextMeshPro（如 HotCount）。")]
+    [SerializeField] TMP_Text _hotSwipeCountText;
 
     [Header("System References")]
     [SerializeField] ComboStreakCounter _comboStreakCounter;
@@ -43,9 +45,6 @@ public class ComboStreakView : MonoBehaviour
     [SerializeField] float _expireShakeDuration = 0.3f;
     [SerializeField] float _expireShakeStrength = 16f;
 
-    [Header("Hot Streak Icon")]
-    [SerializeField] float _hotReadyBlinkHalfDuration = 0.45f;
-
     [Header("Hot Start Duang")]
     [SerializeField] float _hotStartPunchDuration = 0.45f;
     [SerializeField] float _hotStartPunchStrength = 0.38f;
@@ -53,23 +52,35 @@ public class ComboStreakView : MonoBehaviour
     [SerializeField] float _hotStartPunchElasticity = 0.42f;
 
     [Header("Hot Streak Shake")]
+    [Tooltip("开场缓冲期间的剧烈抖动强度；时长取自 HotPreBufferDuration。")]
+    [SerializeField] float _hotIntroStrength = 20f;
     [SerializeField] float _hotLoopDuration = 0.35f;
     [SerializeField] float _hotLoopStrength = 6f;
     [SerializeField] float _hotEndDuration = 0.45f;
     [SerializeField] float _hotEndStrength = 28f;
 
+    [Header("Hot Swipe Count")]
+    [SerializeField] float _hotCountMinScale = 1f;
+    [SerializeField] float _hotCountMaxScale = 1.9f;
+    [Tooltip("大约刷到此次数时 scale 接近上限。")]
+    [SerializeField] int _hotCountScaleAt = 12;
+    [SerializeField] float _hotCountPunchStrength = 0.28f;
+    [SerializeField] float _hotCountPunchDuration = 0.22f;
+    [SerializeField] int _hotCountPunchVibrato = 8;
+    [SerializeField] float _hotCountPunchElasticity = 0.55f;
+
     RectTransform _displayRect;
     Vector2 _restAnchoredPosition;
     Vector3 _restLocalScale;
+    RectTransform _hotCountRect;
+    Vector3 _hotCountRestScale = Vector3.one;
     int _lastStreak;
+    int _hotSwipeCount;
     bool _hotEndPlaying;
     bool _expireWarningPlayed;
     float _peakScale = 1f;
     float _currentTargetScale = 1f;
     float _scaleOverrideUntil;
-    Image _hotReadyIconImage;
-    Color _hotReadyIconBaseColor;
-    Tweener _hotReadyBlinkTween;
 
     void Awake()
     {
@@ -89,12 +100,13 @@ public class ComboStreakView : MonoBehaviour
         }
 
         if (_hotReadyIcon != null)
-        {
-            _hotReadyIconImage = _hotReadyIcon.GetComponent<Image>();
-            if (_hotReadyIconImage != null)
-                _hotReadyIconBaseColor = _hotReadyIconImage.color;
-
             _hotReadyIcon.SetActive(false);
+
+        if (_hotSwipeCountText != null)
+        {
+            _hotCountRect = _hotSwipeCountText.rectTransform;
+            _hotCountRestScale = _hotCountRect.localScale;
+            SetHotCountVisible(false);
         }
     }
 
@@ -115,6 +127,7 @@ public class ComboStreakView : MonoBehaviour
         {
             _hotTimeController.OnHotTimeStarted += HandleHotTimeStarted;
             _hotTimeController.OnHotTimeEnded += HandleHotTimeEnded;
+            _hotTimeController.OnHotSwipe += HandleHotSwipe;
         }
 
         if (_runController != null)
@@ -132,6 +145,7 @@ public class ComboStreakView : MonoBehaviour
         {
             _hotTimeController.OnHotTimeStarted -= HandleHotTimeStarted;
             _hotTimeController.OnHotTimeEnded -= HandleHotTimeEnded;
+            _hotTimeController.OnHotSwipe -= HandleHotSwipe;
         }
 
         if (_runController != null)
@@ -167,29 +181,58 @@ public class ComboStreakView : MonoBehaviour
         SetRootActive(true);
         SetTextVisible(false);
         SetHotStreakIconVisible(true);
+        ResetHotSwipeCount(show: true);
         PlayHotStartDuang();
+        StartHotIntroShake();
+    }
+
+    void HandleHotSwipe(bool wasCorrect)
+    {
+        if (!wasCorrect || !IsHotActive())
+            return;
+
+        _hotSwipeCount++;
+        UpdateHotSwipeCountText();
+        ApplyHotCountScale(playPunch: true);
     }
 
     void PlayHotStartDuang()
     {
         if (_displayRect == null)
+            return;
+
+        _scaleOverrideUntil = Time.time + _hotStartPunchDuration;
+        _currentTargetScale = _maxScale;
+
+        _displayRect.anchoredPosition = _restAnchoredPosition;
+        _displayRect.localScale = _restLocalScale * _maxScale;
+        _displayRect.DOPunchScale(
+            Vector3.one * _hotStartPunchStrength,
+            _hotStartPunchDuration,
+            _hotStartPunchVibrato,
+            _hotStartPunchElasticity);
+    }
+
+    void StartHotIntroShake()
+    {
+        if (_displayRect == null)
+            return;
+
+        float introDuration = GetHotPreBufferDuration();
+        if (introDuration <= 0f)
         {
             StartHotLoopShake();
             return;
         }
 
-        _scaleOverrideUntil = Time.time + _hotStartPunchDuration;
-        _currentTargetScale = _maxScale;
-
-        _displayRect.DOKill(complete: false);
         _displayRect.anchoredPosition = _restAnchoredPosition;
-        _displayRect.localScale = _restLocalScale * _maxScale;
         _displayRect
-            .DOPunchScale(
-                Vector3.one * _hotStartPunchStrength,
-                _hotStartPunchDuration,
-                _hotStartPunchVibrato,
-                _hotStartPunchElasticity)
+            .DOShakeAnchorPos(
+                introDuration,
+                _hotIntroStrength,
+                vibrato: 24,
+                randomness: 90f,
+                fadeOut: true)
             .OnComplete(StartHotLoopShake);
     }
 
@@ -358,11 +401,13 @@ public class ComboStreakView : MonoBehaviour
 
     void StartHotLoopShake()
     {
-        if (_displayRect == null)
+        if (_displayRect == null || !IsHotActive())
             return;
 
-        StopPositionShake();
+        // 只清位置抖动，保留可能仍在播放的开场 scale punch。
+        _displayRect.DOKill(complete: false);
         _displayRect.anchoredPosition = _restAnchoredPosition;
+        _displayRect.localScale = _restLocalScale * _currentTargetScale;
         _displayRect.DOShakeAnchorPos(
                 _hotLoopDuration,
                 _hotLoopStrength,
@@ -395,6 +440,7 @@ public class ComboStreakView : MonoBehaviour
     {
         StopAllTweens();
         SetHotStreakIconVisible(false);
+        ResetHotSwipeCount(show: false);
         ResetTransform();
         SetRootActive(false);
         SetTextVisible(false);
@@ -402,43 +448,66 @@ public class ComboStreakView : MonoBehaviour
 
     void SetHotStreakIconVisible(bool visible)
     {
-        if (_hotReadyIcon == null)
-            return;
-
-        if (!visible)
-        {
-            StopHotStreakIconBlink();
-            _hotReadyIcon.SetActive(false);
-            return;
-        }
-
-        _hotReadyIcon.SetActive(true);
-        StartHotStreakIconBlink();
+        if (_hotReadyIcon != null)
+            _hotReadyIcon.SetActive(visible);
     }
 
-    void StartHotStreakIconBlink()
+    void ResetHotSwipeCount(bool show)
     {
-        if (_hotReadyIconImage == null)
-            return;
-
-        StopHotStreakIconBlink();
-        _hotReadyIconImage.color = _hotReadyIconBaseColor;
-        _hotReadyBlinkTween = _hotReadyIconImage
-            .DOColor(Color.white, _hotReadyBlinkHalfDuration)
-            .SetEase(Ease.Linear)
-            .SetLoops(-1, LoopType.Yoyo);
+        _hotSwipeCount = 0;
+        UpdateHotSwipeCountText();
+        ResetHotCountTransform();
+        SetHotCountVisible(show);
     }
 
-    void StopHotStreakIconBlink()
+    void UpdateHotSwipeCountText()
     {
-        if (_hotReadyBlinkTween != null)
-        {
-            _hotReadyBlinkTween.Kill();
-            _hotReadyBlinkTween = null;
-        }
+        if (_hotSwipeCountText != null)
+            _hotSwipeCountText.text = _hotSwipeCount.ToString();
+    }
 
-        if (_hotReadyIconImage != null)
-            _hotReadyIconImage.color = _hotReadyIconBaseColor;
+    void ApplyHotCountScale(bool playPunch)
+    {
+        if (_hotCountRect == null)
+            return;
+
+        float targetScale = CalculateHotCountScale(_hotSwipeCount);
+        _hotCountRect.DOKill(complete: false);
+        _hotCountRect.localScale = _hotCountRestScale * targetScale;
+
+        if (!playPunch)
+            return;
+
+        _hotCountRect.DOPunchScale(
+            Vector3.one * _hotCountPunchStrength,
+            _hotCountPunchDuration,
+            _hotCountPunchVibrato,
+            _hotCountPunchElasticity);
+    }
+
+    float CalculateHotCountScale(int count)
+    {
+        if (count <= 0)
+            return _hotCountMinScale;
+
+        int span = Mathf.Max(1, _hotCountScaleAt);
+        float progress = Mathf.Clamp01((float)count / span);
+        return Mathf.Lerp(_hotCountMinScale, _hotCountMaxScale, progress);
+    }
+
+    void ResetHotCountTransform()
+    {
+        if (_hotCountRect == null)
+            return;
+
+        _hotCountRect.DOKill(complete: false);
+        _hotCountRect.localScale = _hotCountRestScale * _hotCountMinScale;
+    }
+
+    void SetHotCountVisible(bool visible)
+    {
+        if (_hotSwipeCountText != null)
+            _hotSwipeCountText.gameObject.SetActive(visible);
     }
 
     void SetRootActive(bool active)
@@ -490,7 +559,7 @@ public class ComboStreakView : MonoBehaviour
 
     void StopAllTweens()
     {
-        StopHotStreakIconBlink();
+        ResetHotCountTransform();
 
         if (_displayRect == null)
             return;
@@ -508,5 +577,11 @@ public class ComboStreakView : MonoBehaviour
     {
         GameBalanceConfig config = _runController != null ? _runController.BalanceConfig : null;
         return config != null ? Mathf.Max(1, config.HotTriggerStreak) : 5;
+    }
+
+    float GetHotPreBufferDuration()
+    {
+        GameBalanceConfig config = _runController != null ? _runController.BalanceConfig : null;
+        return config != null ? Mathf.Max(0f, config.HotPreBufferDuration) : 0.4f;
     }
 }
